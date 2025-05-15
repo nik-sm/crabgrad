@@ -72,6 +72,7 @@ impl Trainer {
     pub fn fit(&mut self, data: &Vec<Vec<f64>>, labels: &[u8]) -> &mut Self {
         // Convert data and labels to Values as needed
         let data: Vec<Vec<Value>> = data.iter().map(|row| row.iter().map(|&x| Value::new(x)).collect()).collect();
+        dbg!(&data, &labels);
 
         let loss = 0.0;
         let acc = 0.0;
