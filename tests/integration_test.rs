@@ -7,23 +7,24 @@ mod tests {
     use micrograd_rs::{assert_close, assert_not_close};
     use paste::paste;
     use rand;
-
     use rand_distr::{Distribution, Normal};
+    use tch::Tensor;
 
     fn fake_data() -> (Vec<f64>, Vec<u8>) {
         let n = 1000;
-        let rng = &mut rand::thread_rng();
+        let mut rng = rand::rng();
         let mut data: Vec<f64> = Vec::with_capacity(2 * n);
         let mut labels: Vec<u8> = Vec::with_capacity(2 * n);
 
         // class 0
         let normal = Normal::new(0.0, 1.0).unwrap();
-        data.extend((0..n).map(|_| normal.sample(rng)));
+
+        data.extend(normal.sample_iter(&mut rng).take(n));
         labels.extend(vec![0u8; n]);
 
         // class 1
         let normal = Normal::new(2.0, 1.0).unwrap();
-        data.extend((0..n).map(|_| normal.sample(rng)));
+        data.extend(normal.sample_iter(&mut rng).take(n));
         labels.extend(vec![0u8; n]);
 
         (data, labels)
@@ -99,5 +100,78 @@ mod tests {
         let clone = node.clone();
         assert!(node == clone);
         assert!(visited.contains(&clone));
+    }
+
+    #[test]
+    fn check_torch_install() {
+        let t = Tensor::from_slice(&[3, 1, 4, 1, 5]);
+        let t = t * 2;
+        t.print();
+    }
+
+    #[test]
+    fn compare_to_torch() {
+        let x = Value::from(-4.0);
+        let z = 2 * x + 2 + x;
+        let q = z.relu() + z * x;
+        let h = (z * z).relu();
+        let y = h + q + q * x;
+        y.backward();
+        let (xmg, ymg) = (x, y);
+
+        let mut x = Tensor::from(-4.0);
+        x.set_requires_grad(true);
+        let z: Tensor = 2.0 * x + 2.0 + x;
+        let q = z.relu() + z * x;
+        let h = (z * z).relu();
+        let y = h + q + q * x;
+        y.backward();
+        let (xpt, ypt) = (x, y);
+
+        //  forward pass went well
+        assert_eq!(ymg.data(), ypt.data().double_value(&[0]));
+        // backward pass went well
+        assert_eq!(xmg.grad().unwrap(), xpt.grad().double_value(&[0]));
+
+        // def test_more_ops():
+
+        //     a = Value(-4.0)
+        //     b = Value(2.0)
+        //     c = a + b
+        //     d = a * b + b**3
+        //     c += c + 1
+        //     c += 1 + c + (-a)
+        //     d += d * 2 + (b + a).relu()
+        //     d += 3 * d + (b - a).relu()
+        //     e = c - d
+        //     f = e**2
+        //     g = f / 2.0
+        //     g += 10.0 / f
+        //     g.backward()
+        //     amg, bmg, gmg = a, b, g
+
+        //     a = torch.Tensor([-4.0]).double()
+        //     b = torch.Tensor([2.0]).double()
+        //     a.requires_grad = True
+        //     b.requires_grad = True
+        //     c = a + b
+        //     d = a * b + b**3
+        //     c = c + c + 1
+        //     c = c + 1 + c + (-a)
+        //     d = d + d * 2 + (b + a).relu()
+        //     d = d + 3 * d + (b - a).relu()
+        //     e = c - d
+        //     f = e**2
+        //     g = f / 2.0
+        //     g = g + 10.0 / f
+        //     g.backward()
+        //     apt, bpt, gpt = a, b, g
+
+        //     tol = 1e-6
+        //     # forward pass went well
+        //     assert abs(gmg.data - gpt.data.item()) < tol
+        //     # backward pass went well
+        //     assert abs(amg.grad - apt.grad.item()) < tol
+        //     assert abs(bmg.grad - bpt.grad.item()) < tol
     }
 }

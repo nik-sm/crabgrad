@@ -31,6 +31,12 @@ impl From<f64> for Value {
     }
 }
 
+impl From<i64> for Value {
+    fn from(data: i64) -> Self {
+        Self(Rc::new(RefCell::new(ValueInner::from(data))))
+    }
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         ptr::eq(self.0.as_ptr(), other.0.as_ptr())
@@ -53,6 +59,11 @@ impl ValueInner {
 impl From<f64> for ValueInner {
     fn from(data: f64) -> Self {
         ValueInner { data, grad: None, backward_fn: None, prev_nodes: None }
+    }
+}
+impl From<i64> for ValueInner {
+    fn from(data: i64) -> Self {
+        ValueInner { data: data as f64, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
@@ -84,6 +95,10 @@ impl Value {
 
     pub fn data(&self) -> f64 {
         self.borrow().data
+    }
+
+    pub fn grad(&self) -> Option<f64> {
+        self.borrow().grad
     }
 
     pub fn to_string(&self) -> String {
@@ -122,7 +137,7 @@ impl Value {
         Value::new(data, Some(prev_nodes), Some(backward_fn))
     }
 
-    pub fn backwards(&self) {
+    pub fn backward(&self) {
         // Topological order means for all directed edges  parent->child, parent appears first
         // To easily satisfy this property, we add each child, then add its parents, and reverse the whole list at the end
 
@@ -172,7 +187,14 @@ macro_rules! impl_binary_op {
         }
 
         // Value on RHS
+        // TODO - deduplicate
         impl $trait<Value> for f64 {
+            type Output = Value;
+            fn $method(self, rhs: Value) -> Value {
+                Value::from(self) $operator rhs
+            }
+        }
+        impl $trait<Value> for i64 {
             type Output = Value;
             fn $method(self, rhs: Value) -> Value {
                 Value::from(self) $operator rhs
@@ -183,6 +205,12 @@ macro_rules! impl_binary_op {
         impl $trait<f64> for Value {
             type Output = Self;
             fn $method(self, rhs: f64) -> Self {
+                self $operator Value::from(rhs)
+            }
+        }
+        impl $trait<i64> for Value {
+            type Output = Self;
+            fn $method(self, rhs: i64) -> Self {
                 self $operator Value::from(rhs)
             }
         }
