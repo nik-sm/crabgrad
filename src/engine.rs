@@ -1,3 +1,4 @@
+use crate::impl_binary_op;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -173,60 +174,7 @@ impl Value {
     }
 }
 
-macro_rules! impl_binary_op {
-    ($self:ident, $rhs:ident, $trait:ident, $method:ident, $operator:tt, $body:tt) =>
-    (
-
-        // Value on both sides
-        impl $trait for Value
-        {
-            type Output = Self;
-            fn $method($self, $rhs: Self) -> Self {
-                $body
-            }
-        }
-
-        // Value on RHS
-        // TODO - deduplicate
-        impl $trait<Value> for f64 {
-            type Output = Value;
-            fn $method(self, rhs: Value) -> Value {
-                Value::from(self) $operator rhs
-            }
-        }
-        impl $trait<Value> for i64 {
-            type Output = Value;
-            fn $method(self, rhs: Value) -> Value {
-                Value::from(self) $operator rhs
-            }
-        }
-
-        // Value on LHS
-        impl $trait<f64> for Value {
-            type Output = Self;
-            fn $method(self, rhs: f64) -> Self {
-                self.clone() $operator Self::from(rhs)
-            }
-        }
-        impl $trait<i64> for Value {
-            type Output = Self;
-            fn $method(self, rhs: i64) -> Self {
-                self.clone() $operator Self::from(rhs)
-            }
-        }
-
-        // Method-call style
-        impl Value {
-            fn $method<T: Into<Self>>(&self, rhs: T) -> Self {
-                self.clone() $operator rhs.into()
-            }
-        }
-    )
-}
-
-// NOTE - careful about borrow muts, since both LHS and RHS could be same Value
-// Thus, need to finish dealing with LHS before dealing with RHS
-impl_binary_op!(self, rhs, Add, add, +, {
+impl_binary_op!(self, rhs, Add, add, _add, +, {
     let data = self.data() + rhs.data();
     let prev_nodes = vec![self.clone(), rhs.clone()];
     let backward_fn = |our_value_inner: &ValueInner| {
@@ -248,7 +196,7 @@ impl_binary_op!(self, rhs, Add, add, +, {
     Value::new(data, Some(prev_nodes), Some(backward_fn))
 }
 );
-impl_binary_op!(self, rhs, Mul, mul, *, {
+impl_binary_op!(self, rhs, Mul, mul, _mul, *, {
     let data = self.data() * rhs.data();
     let prev_nodes = vec![self.clone(), rhs.clone()];
     let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
@@ -267,10 +215,10 @@ impl_binary_op!(self, rhs, Mul, mul, *, {
     };
     Value::new(data, Some(prev_nodes), Some(backward_fn))
 });
-impl_binary_op!(self, rhs, Div, div, /, {
+impl_binary_op!(self, rhs, Div, div, _div, /, {
     self * rhs.pow(-1.0)
 });
-impl_binary_op!(self, rhs, Sub, sub, -, {
+impl_binary_op!(self, rhs, Sub, sub, _sub, -, {
     self + (-1.0 * rhs)
 });
 

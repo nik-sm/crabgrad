@@ -1,7 +1,7 @@
 pub mod engine;
 pub mod nn;
+pub mod ops;
 pub mod util;
-
 pub use engine::Value;
 
 #[cfg(test)]
@@ -11,6 +11,7 @@ mod tests {
     use crate::nn::Trainer;
     use crate::nn::cross_entropy;
     use crate::{assert_close, assert_not_close};
+    use anyhow::Result;
     use paste::paste;
     use rand;
     use rand_distr::{Distribution, Normal};
@@ -109,10 +110,11 @@ mod tests {
     }
 
     #[test]
-    fn check_torch_install() {
+    fn check_torch_install() -> Result<()> {
         let t = Tensor::from_slice(&[3, 1, 4, 1, 5]);
         let t = t * 2;
-        t.print();
+        assert_eq!(Vec::<i64>::try_from(t)?, vec![6, 2, 8, 2, 10]);
+        Ok(())
     }
 
     #[test]
@@ -154,12 +156,12 @@ mod tests {
     #[test]
     fn compare_torch_many1() {
         let x = Value::from(-4.0);
-        let z = 2 * x.clone() + 2 + x.clone();
-        let q = z.clone().relu() + z.clone() * x.clone();
-        let h = (z.clone() * z.clone()).relu();
-        let y = h + q.clone() + q.clone() * x.clone();
+        let z = 2 * &x + 2 + &x;
+        let q = &z.relu() + &z * &x;
+        let h = (&z * &z).relu();
+        let y = h + &q + &q * &x;
         y.backward();
-        let (xmg, ymg) = (x.clone(), y);
+        let (xmg, ymg) = (&x, y);
 
         let x = Tensor::from(-4.0).set_requires_grad(true);
         let z: Tensor = 2.0 * &x + 2.0 + &x;
@@ -180,16 +182,16 @@ mod tests {
     fn compare_torch_many2() {
         let a = Value::from(-4.0);
         let b = Value::from(2.0);
-        let c = a.clone() + b.clone();
-        let d = a.clone() * b.clone() + b.clone().pow(3.0);
-        let c = c.clone() + c + 1.0;
-        let c = c.clone() + 1 + c + (-1 * a.clone());
-        let d = d.clone() + d.clone() * 2 + (b.clone() + a.clone()).relu();
-        let d = d.clone() + 3 * d.clone() + (b.clone() - a.clone()).relu();
-        let e = c.clone() - d.clone();
-        let f = e.clone().pow(2.0);
-        let g = f.clone() / 2.0;
-        let g = g.clone() + 10.0 / f.clone();
+        let c = &a + &b;
+        let d = &a * &b + &b.pow(3.0);
+        let c = &c + &c + 1.0;
+        let c = &c + 1 + c + (-1 * &a);
+        let d = &d + &d * 2 + (&b + &a).relu();
+        let d = &d + 3 * &d + (&b - &a).relu();
+        let e = &c - &d;
+        let f = e.pow(2.0);
+        let g = &f / Value::from(2.0);
+        let g = &g + 10.0 / f.clone();
         g.backward();
         let (amg, bmg, gmg) = (a, b, g);
 
@@ -202,8 +204,8 @@ mod tests {
         let d = &d + &d * 2 + (&b + &a).relu();
         let d = &d + 3 * &d + (&b - &a).relu();
         let e: Tensor = &c - &d;
-        let f = &e.pow(&Tensor::from(2.0));
-        let g = f / &Tensor::from(2.0);
+        let f = e.pow(&Tensor::from(2.0));
+        let g = &f / &Tensor::from(2.0);
         let g: Tensor = &g + &Tensor::from(10.0) / f;
         g.backward();
         let (apt, bpt, gpt) = (a, b, g);
