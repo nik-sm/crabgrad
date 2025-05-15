@@ -11,7 +11,7 @@ pub trait Module {
         }
     }
 
-    fn parameters(&self) -> Vec<&Value>;
+    fn parameters(&self) -> Vec<Value>;
 
     fn forward(&self, data: &[Value]) -> Result<Vec<Value>>;
 }
@@ -70,8 +70,8 @@ impl Module for Neuron {
         Ok(vec![result])
     }
 
-    fn parameters(&self) -> Vec<&Value> {
-        self.weights.iter().chain(self.bias.as_ref()).collect()
+    fn parameters(&self) -> Vec<Value> {
+        self.weights.iter().chain(self.bias.as_ref()).cloned().collect()
     }
 }
 
@@ -89,7 +89,7 @@ impl Module for Layer {
         self.neurons.iter().map(|neuron| neuron.forward(data)).flatten_ok().collect()
     }
 
-    fn parameters(&self) -> Vec<&Value> {
+    fn parameters(&self) -> Vec<Value> {
         self.neurons.iter().flat_map(|neuron| neuron.parameters()).collect()
     }
 }
@@ -126,7 +126,7 @@ impl Module for MLP {
         Ok(next.clone())
     }
 
-    fn parameters(&self) -> Vec<&Value> {
+    fn parameters(&self) -> Vec<Value> {
         self.layers.iter().flat_map(|layer| layer.parameters()).collect()
     }
 }

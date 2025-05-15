@@ -1,4 +1,5 @@
-use crate::nn::Module;
+use crate::engine::Value;
+
 pub trait Optim {
     fn zero_grad(&self);
     fn step(&self);
@@ -9,45 +10,34 @@ pub enum OptimType {
     ADAM,
 }
 
-pub struct SGD<'a> {
-    model: &'a dyn Module,
+pub struct SGD {
+    parameters: Vec<Value>,
     lr: f64,
 }
 
-impl<'a> SGD<'a> {
-    pub fn new(model: &'a dyn Module, lr: f64) -> Self {
-        Self { model, lr }
+impl SGD {
+    pub fn new(parameters: Vec<Value>, lr: f64) -> Self {
+        Self { parameters, lr }
     }
 }
 
-impl Optim for SGD<'_> {
+impl Optim for SGD {
     fn zero_grad(&self) {
-        self.model.parameters().iter().for_each(|p| p.zero_grad());
+        for p in &self.parameters {
+            p.zero_grad();
+        }
     }
     fn step(&self) {
-        self.model
-            .parameters()
-            .iter()
-            .for_each(|p| p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad"))
-    }
-}
-
-pub struct ADAM<'a> {
-    model: &'a dyn Module,
-    lr: f64,
-}
-
-impl<'a> ADAM<'a> {
-    pub fn new(model: &'a dyn Module, lr: f64) -> Self {
-        Self { model, lr }
-    }
-}
-
-impl Optim for ADAM<'_> {
-    fn zero_grad(&self) {
-        self.model.parameters().iter().for_each(|p| p.zero_grad());
-    }
-    fn step(&self) {
-        todo!()
+        for p in &self.parameters {
+            match p.backward_fn() {
+                Some(_) => {
+                    dbg!("before", &p);
+                    p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad");
+                    dbg!("after", &p);
+                    panic!("disco")
+                }
+                _ => p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad"),
+            }
+        }
     }
 }

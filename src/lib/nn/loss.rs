@@ -20,18 +20,21 @@ pub fn log_softmax(logits: &[Value]) -> Vec<Value> {
 }
 
 pub fn logsumexp(logits: &[Value]) -> Value {
-    // Subtract max value, which gives equivalent result but more numerically stable
-    let values: Vec<f64> = logits.iter().map(|v| v.data()).collect();
-    let mut max_val = f64::NEG_INFINITY;
-    for v in values {
-        if v.is_finite() && v > max_val {
-            max_val = v
+    fn max_val(logits: &[Value]) -> f64 {
+        let mut max_val = f64::NEG_INFINITY;
+        for v in logits.iter().map(|v| v.data()) {
+            if v.is_finite() && v > max_val {
+                max_val = v
+            }
         }
+        if max_val == f64::NEG_INFINITY {
+            max_val = 0.0;
+        }
+        max_val
     }
-    if max_val == f64::NEG_INFINITY {
-        max_val = 0.0;
-    }
-    let shifted_logits = logits.iter().map(|v| v - max_val);
+
+    // Subtract max value, which gives equivalent result but more numerically stable
+    let shifted_logits = logits.iter().map(|v| v - max_val(logits));
 
     shifted_logits.map(|v| v.exp()).fold(Value::from(0.0), |acc, val| acc + val).log()
 }

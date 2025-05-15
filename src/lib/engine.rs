@@ -124,6 +124,10 @@ impl Value {
         self.borrow().grad
     }
 
+    pub fn backward_fn(&self) -> Option<fn(&ValueInner)> {
+        self.borrow().backward_fn
+    }
+
     pub fn zero_grad(&self) {
         self.borrow_mut().grad = None
     }
