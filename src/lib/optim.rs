@@ -29,7 +29,7 @@ impl Optim for SGD {
     }
     fn step(&self) {
         for p in &self.parameters {
-            p.borrow_mut().data = p.data() + self.lr * p.grad().expect("step without grad");
+            p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad");
         }
     }
 }

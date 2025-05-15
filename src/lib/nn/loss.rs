@@ -24,7 +24,7 @@ cross_entropy(pred_probs, true_probs) = true_probs * log_softmax(logits)
 pub fn cross_entropy_single(label: DiscreteLabel, logits: &[Value]) -> Value {
     let log_probs = log_softmax(logits);
     let msg = format!("label must be in range [0, {}]", logits.len());
-    log_probs.get(label).expect(&msg).clone()
+    -1.0 * log_probs.get(label).expect(&msg).clone()
 }
 
 pub fn log_softmax(logits: &[Value]) -> Vec<Value> {
@@ -56,6 +56,7 @@ pub fn logsumexp(logits: &[Value]) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_close;
     use crate::engine::{DiscreteLabel, Value};
     use crate::optim::{Optim, SGD};
     use anyhow::Result;
@@ -83,7 +84,6 @@ mod tests {
         let loss = cross_entropy_single(y_true, &logits);
         let optim = SGD::new(logits.clone(), 1e-3);
 
-        let target_value_before = logits.get(y_true).unwrap().data();
         optim.zero_grad();
         loss.backward();
         optim.step();
@@ -97,6 +97,9 @@ mod tests {
         let mut optim_t = tch::nn::Sgd { momentum: 0.0, dampening: 0.0, wd: 0.0, nesterov: false }.build(&vs, 1e-3)?;
 
         optim_t.backward_step(&loss_t);
+        assert_close!(loss.data(), loss_t.double_value(&[]));
+        assert_close!(logits[0].grad().unwrap(), logits_t.get(0).grad().double_value(&[]));
+
         Ok(())
     }
 }
