@@ -25,7 +25,10 @@ impl Optim for SGD<'_> {
         self.model.parameters().iter().for_each(|p| p.zero_grad());
     }
     fn step(&self) {
-        self.model.parameters().iter().for_each(|p| p.borrow_mut().data = p.data() + self.lr * p.grad().unwrap_or(0.0))
+        self.model
+            .parameters()
+            .iter()
+            .for_each(|p| p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad"))
     }
 }
 

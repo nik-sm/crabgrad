@@ -7,8 +7,6 @@ use std::ops::{Add, Deref, Div, Mul, Sub};
 use std::ptr;
 use std::rc::Rc;
 
-const PRECISION: usize = 3;
-
 #[derive(Debug, Clone)]
 pub struct ValueInner {
     pub data: f64,
@@ -59,7 +57,8 @@ impl Eq for Value {}
 
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        ptr::hash(self.0.as_ptr(), state);
+        let h: *mut ValueInner = self.0.as_ptr();
+        ptr::hash(h, state);
     }
 }
 
@@ -161,6 +160,22 @@ impl Value {
         Value::from(f64::consts::E).pow(self.clone())
     }
 
+    pub fn log(&self) -> Value {
+        let data = f64::ln(self.data());
+        let prev_nodes = vec![self.clone()];
+        let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
+            Some([orig]) => {
+                let our_grad = our_value_inner.grad.unwrap_or(0.0);
+                let mut orig = orig.borrow_mut();
+                orig.grad = Some(orig.grad.unwrap_or(0.0) + 1.0 / our_grad);
+            }
+            _ => {
+                unreachable!("binary op must have two ancestors")
+            }
+        };
+        Value::new(data, Some(prev_nodes), Some(backward_fn))
+    }
+
     pub fn backward(&self) {
         // Topological order means for all directed edges  parent->child, parent appears first
         // To easily satisfy this property, we add each child, then add its parents, and reverse the whole list at the end
@@ -195,6 +210,22 @@ impl Value {
         };
         Value::new(data, Some(prev_nodes), Some(backward_fn))
     }
+}
+
+pub fn argmax(values: &Vec<Value>) -> usize {
+    // For now (while Value is scalar) - a separate function.
+    // Even once Value contains vector - this is non-differentiable and the returned
+    // Value objects do not have grad or backward_fn set
+
+    let mut max_idx = 0;
+    let mut max_val = f64::NEG_INFINITY;
+    for (idx, v) in values.iter().enumerate() {
+        if v.data().is_finite() && v.data() > max_val {
+            max_val = v.data();
+            max_idx = idx;
+        }
+    }
+    max_idx
 }
 
 impl_binary_op!(self, rhs, Add, add, _add, +, {

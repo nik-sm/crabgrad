@@ -43,7 +43,9 @@ macro_rules! impl_binary_op {
         }
 
         // Value on RHS, f64
-        // TODO - deduplicate
+        // TODO - deduplicate, possibly by using Into<Value>
+        // except without a negative trait or some strategy with marker traits,
+        // there becomes an issue of conflicting impl
         impl $trait<Value> for f64 {
             type Output = Value;
             fn $method(self, rhs: Value) -> Self::Output {
@@ -51,6 +53,18 @@ macro_rules! impl_binary_op {
             }
         }
         impl $trait<&Value> for f64 {
+            type Output = Value;
+            fn $method(self, rhs: &Value) -> Self::Output {
+                Value::from(self).$func(rhs)
+            }
+        }
+        impl $trait<Value> for &f64 {
+            type Output = Value;
+            fn $method(self, rhs: Value) -> Self::Output {
+                Value::from(self).$func(&rhs)
+            }
+        }
+        impl $trait<&Value> for &f64 {
             type Output = Value;
             fn $method(self, rhs: &Value) -> Self::Output {
                 Value::from(self).$func(rhs)
@@ -70,6 +84,18 @@ macro_rules! impl_binary_op {
                 Value::from(self).$func(rhs)
             }
         }
+        impl $trait<Value> for &i64 {
+            type Output = Value;
+            fn $method(self, rhs: Value) -> Self::Output {
+                Value::from(self).$func(&rhs)
+            }
+        }
+        impl $trait<&Value> for &i64 {
+            type Output = Value;
+            fn $method(self, rhs: &Value) -> Self::Output {
+                Value::from(self).$func(rhs)
+            }
+        }
 
         // Value on LHS, f64
         impl $trait<f64> for Value {
@@ -84,6 +110,18 @@ macro_rules! impl_binary_op {
                 self.$func(&Value::from(rhs))
             }
         }
+        impl $trait<&f64> for Value {
+            type Output = Value;
+            fn $method(self, rhs: &f64) -> Self::Output {
+                self.$func(&Value::from(rhs))
+            }
+        }
+        impl $trait<&f64> for &Value {
+            type Output = Value;
+            fn $method(self, rhs: &f64) -> Self::Output {
+                self.$func(&Value::from(rhs))
+            }
+        }
 
         // Value on LHS, i64
         impl $trait<i64> for Value {
@@ -95,6 +133,18 @@ macro_rules! impl_binary_op {
         impl $trait<i64> for &Value {
             type Output = Value;
             fn $method(self, rhs: i64) -> Self::Output {
+                self.$func(&Value::from(rhs))
+            }
+        }
+        impl $trait<&i64> for Value {
+            type Output = Value;
+            fn $method(self, rhs: &i64) -> Self::Output {
+                self.$func(&Value::from(rhs))
+            }
+        }
+        impl $trait<&i64> for &Value {
+            type Output = Value;
+            fn $method(self, rhs: &i64) -> Self::Output {
                 self.$func(&Value::from(rhs))
             }
         }

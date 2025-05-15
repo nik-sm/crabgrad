@@ -5,6 +5,7 @@ use env_logger::{Builder, Env};
 use itertools::Itertools;
 use log::Level;
 use rand;
+use rand::seq::SliceRandom;
 use rand_distr::{Distribution, Normal};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -41,7 +42,8 @@ pub fn try_init_logging() -> Result<()> {
             let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string().truecolor(120, 120, 120);
             // let target = record.target().to_string().truecolor(147, 182, 182);
 
-            let path = record.file_static().unwrap_or("unknown").to_string().truecolor(200, 200, 200);
+            // let path = record.file().unwrap_or("unknown").to_string().truecolor(200, 200, 200);
+            let path = record.module_path().unwrap_or("unknown").to_string().truecolor(200, 200, 200);
             let lineno = record.line().unwrap_or(0).to_string().truecolor(200, 200, 200);
 
             let args = record.args();
@@ -133,6 +135,21 @@ pub fn make_binary_classification(n_samples_each_class: usize, n_features: usize
     labels.extend(vec![1i64; n_samples_each_class]);
 
     (data, labels)
+}
+
+pub fn train_test_split<T: Clone>(
+    mut zipped_data_labels: Vec<(Vec<T>, i64)>,
+    train_frac: f64,
+    test_frac: f64,
+) -> (Vec<(Vec<T>, i64)>, Vec<(Vec<T>, i64)>) {
+    // let mut zipped_data_labels = zipped_data_labels.into_iter().collect::<Vec<_>>();
+    let mut rng = rand::rng();
+    let n_total = zipped_data_labels.len() as f64;
+    let n_train = (train_frac / (train_frac + test_frac) * n_total) as usize;
+
+    zipped_data_labels.shuffle(&mut rng);
+    let (train_part, test_part) = zipped_data_labels.split_at(n_train);
+    (train_part.to_vec(), test_part.to_vec())
 }
 
 #[cfg(test)]

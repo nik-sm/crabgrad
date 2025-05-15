@@ -1,11 +1,6 @@
-use crate::engine::Value;
-use crate::nn::cross_entropy_single;
-use crate::optim::Optim;
-use crate::utils::try_init_logging;
+use crate::{argmax, engine::Value};
 use anyhow::{Result, bail};
 use itertools::Itertools;
-use rand::rng;
-use rand::seq::SliceRandom;
 use rand_distr::{Distribution, Normal};
 
 pub trait Module {
@@ -20,6 +15,25 @@ pub trait Module {
 
     fn forward(&self, data: &[Value]) -> Result<Vec<Value>>;
 }
+
+pub trait Classifier: Module {
+    fn score(&self, data_labels: &[(Vec<Value>, i64)]) -> Result<f64> {
+        let mut n_correct = 0usize;
+        let mut n_total = 0usize;
+
+        for (data, label) in data_labels.into_iter() {
+            let logits = self.forward(&data)?;
+            let pred = argmax(&logits);
+            n_total += 1;
+            if pred == *label as usize {
+                n_correct += 1;
+            }
+        }
+
+        Ok(n_correct as f64 / n_total as f64)
+    }
+}
+impl Classifier for MLP {}
 
 pub struct Neuron {
     weights: Vec<Value>,
@@ -114,50 +128,5 @@ impl Module for MLP {
 
     fn parameters(&self) -> Vec<&Value> {
         self.layers.iter().flat_map(|layer| layer.parameters()).collect()
-    }
-}
-
-pub struct Trainer<'a> {
-    model: &'a dyn Module,
-    optim: &'a dyn Optim,
-    epochs: usize,
-    batch_size: usize,
-}
-impl<'a> Trainer<'a> {
-    pub fn new(model: &'a impl Module, epochs: usize, optim: &'a impl Optim, batch_size: usize) -> Self {
-        Trainer { model, epochs, optim, batch_size }
-    }
-
-    pub fn fit(&self, data_labels: impl IntoIterator<Item = (Vec<f64>, i64)>) -> Result<()> {
-        // Convert data and labels to Values as needed
-        let mut data_labels = data_labels.into_iter().collect::<Vec<_>>();
-        if let Err(e) = try_init_logging() {
-            eprintln!("Error while setting up logging: {e}")
-        }
-
-        let mut rng = rng();
-        for e in 0..self.epochs {
-            data_labels.shuffle(&mut rng);
-            log::info!("{:-^20}", format!("Epoch {e}"));
-            for (batch_idx, chunk) in data_labels.iter().chunks(self.batch_size).into_iter().enumerate() {
-                log::info!("\tBatch {batch_idx}");
-
-                self.optim.zero_grad();
-
-                let mut loss = Value::from(0.0);
-                for (item_idx, (data, label)) in chunk.enumerate() {
-                    log::info!("\t\tItem {item_idx}");
-                    let data: Vec<Value> = data.iter().map(Value::from).collect();
-                    let label: Value = Value::from(label);
-                    let logits: Vec<Value> = self.model.forward(&data)?;
-                    loss = loss + cross_entropy_single(&label, &logits);
-                }
-                loss.backward();
-
-                self.optim.step();
-            }
-        }
-
-        Ok(())
     }
 }

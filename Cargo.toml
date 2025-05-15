@@ -4,11 +4,15 @@ version = "0.1.0"
 edition = "2024"
 resolver = "3"
 
+[lib]
+path="src/lib/lib.rs"
+
 [dependencies]
 anyhow = "1.0.98"
 chrono = "0.4.41"
 colored = "3.0.0"
 env_logger = "0.11.8"
+indicatif = "0.17.11"
 itertools = "0.14.0"
 log = "0.4.27"
 paste = "1.0.15"
@@ -20,4 +24,4 @@ tch = "0.20.0"
 
 [[bin]]
 name = "mlp"
-path = "examples/main.rs"
+path = "src/bin/mlp.rs"

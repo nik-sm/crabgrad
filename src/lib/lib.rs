@@ -1,5 +1,5 @@
 pub mod engine;
-pub use engine::Value;
+pub use engine::{Value, argmax};
 
 pub mod nn;
 
