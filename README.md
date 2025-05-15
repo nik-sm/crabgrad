@@ -1,6 +1,6 @@
-# TODO
+# Setup
 
-- Test by comparing results to torch:
+- To enable comparison against torch, using `tch-rs`:
     ```shell
     VENV_PATH="$HOME/.venv"
     PYTHON_VERSION=3.13
@@ -12,12 +12,17 @@
     cargo test
     ```
 
+Next steps:
+- Engineering and ergonomics:
+    - Avoid the need for using `value.clone()` everywhere, by implementing operator traits like `Add` for `Value, Value`, `Value, &Value`, `&Value, Value`, and `&Value, &Value`
+    - Be sure all ops can be used on literals of `i64` or `f64`, and add tests
+    - Deduplicate
+
+- More ops:
+    - Implement: +=, -=, *=, /=, unary negation
+
 - Finish models:
     - SGD optimizer
     - loss
+
 - Try on toy dataset task
-
-- Engineering:
-    - deduplicate
-    - if possible: avoid annoying `.clone()` by implementing ops (`+`, etc) without move. unclear if copy semantics works for `Rc<RefCell<_>>`
-
