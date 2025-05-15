@@ -1,12 +1,12 @@
 use crate::engine::Value;
 
-trait Module {
+pub trait Module {
     fn zero_grad(&self) -> ();
 
     fn parameters(&self) -> Vec<Value>;
 }
 
-struct Neuron();
+pub struct Neuron();
 impl Neuron {
     fn new() -> Self {
         unimplemented!()
@@ -21,7 +21,7 @@ impl Module for Neuron {
     }
 }
 
-struct Layer();
+pub struct Layer();
 impl Layer {
     fn new() -> Self {
         unimplemented!()
@@ -42,7 +42,7 @@ impl MLP {
         unimplemented!()
     }
 
-    pub fn forward(&self, data: Vec<Value>) -> Vec<Value> {
+    pub fn forward(&self, data: &[Value]) -> Vec<Value> {
         unimplemented!()
     }
 }
@@ -52,5 +52,32 @@ impl Module for MLP {
     }
     fn parameters(&self) -> Vec<Value> {
         unimplemented!()
+    }
+}
+
+pub struct Trainer {
+    model: Box<dyn Module>,
+    epochs: i32,
+}
+impl Trainer {
+    pub fn new<M: Module + 'static>(model: M, epochs: Option<i32>) -> Self {
+        Trainer {
+            model: Box::new(model),
+            epochs: match epochs {
+                None => 32,
+                Some(x) => x,
+            },
+        }
+    }
+    pub fn fit(&mut self, data: &Vec<Vec<f64>>, labels: &[u8]) -> &mut Self {
+        // Convert data and labels to Values as needed
+        let data: Vec<Vec<Value>> = data.iter().map(|row| row.iter().map(|&x| Value::new(x)).collect()).collect();
+
+        let loss = 0.0;
+        let acc = 0.0;
+        for e in 0..self.epochs {
+            println!("Epoch {e}. \n\tloss: {loss}\n\tacc {acc}")
+        }
+        self
     }
 }

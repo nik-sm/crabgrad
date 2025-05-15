@@ -1,5 +1,5 @@
 use crate::engine::Value;
 
-pub fn cross_entropy(label: Value, logits: Vec<Value>) -> Value {
+pub fn cross_entropy(labels: &[Value], logits: &[Value]) -> Value {
     unimplemented!()
 }
