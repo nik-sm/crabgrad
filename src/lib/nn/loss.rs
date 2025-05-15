@@ -61,8 +61,8 @@ mod tests {
     use crate::optim::{Optim, SGD};
     use anyhow::Result;
     use tch;
-    use tch::nn::OptimizerConfig;
     use tch::Tensor;
+    use tch::nn::OptimizerConfig;
 
     #[test]
     fn test_logsumexp() -> Result<()> {
@@ -89,16 +89,16 @@ mod tests {
         optim.step();
 
         // Try once with torch
-
         let vs = tch::nn::VarStore::new(tch::Device::Cpu);
         let logits_t = vs.root().ones("foo", &[2]);
         let y_true_t = Tensor::from(0i64);
         let loss_t = logits_t.cross_entropy_for_logits(&y_true_t);
-        let mut optim_t = tch::nn::Sgd { momentum: 0.0, dampening: 0.0, wd: 0.0, nesterov: false }.build(&vs, 1e-3)?;
+        let mut optim_t = tch::nn::sgd(0.0, 0.0, 0.0, false).build(&vs, 1e-3)?;
 
         optim_t.backward_step(&loss_t);
         assert_close!(loss.data(), loss_t.double_value(&[]));
-        assert_close!(logits[0].grad().unwrap(), logits_t.get(0).grad().double_value(&[]));
+        assert_close!(logits[0].grad().unwrap(), logits_t.grad().double_value(&[0]));
+        assert_close!(logits[1].grad().unwrap(), logits_t.grad().double_value(&[1]));
 
         Ok(())
     }

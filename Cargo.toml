@@ -20,6 +20,7 @@ rand = "0.9.1"
 rand_distr = "0.5.1"
 
 [dev-dependencies]
+flamegraph = "0.6.8"
 tch = "0.20.0"
 
 [[bin]]
