@@ -22,10 +22,10 @@ impl<'a> SGD<'a> {
 
 impl Optim for SGD<'_> {
     fn zero_grad(&self) {
-        todo!()
+        self.model.parameters().iter().for_each(|p| p.zero_grad());
     }
     fn step(&self) {
-        todo!()
+        self.model.parameters().iter().for_each(|p| p.borrow_mut().data = p.data() + self.lr * p.grad().unwrap_or(0.0))
     }
 }
 
@@ -42,7 +42,7 @@ impl<'a> ADAM<'a> {
 
 impl Optim for ADAM<'_> {
     fn zero_grad(&self) {
-        todo!()
+        self.model.parameters().iter().for_each(|p| p.zero_grad());
     }
     fn step(&self) {
         todo!()

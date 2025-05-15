@@ -1,4 +1,5 @@
 use crate::impl_binary_op;
+use core::f64;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -97,14 +98,14 @@ impl Deref for Value {
     }
 }
 
-fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Value>) -> () {
+fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Value>) {
     // v is the child node and we have a link to our parent nodes
-    if !visited.contains(&node) {
+    if !visited.contains(node) {
         // PartialEq and Hash both use address of ValueInner
         visited.insert(node.clone());
         if let Some(prev) = &node.borrow().prev_nodes {
             for ancestor in prev {
-                build_topo(&ancestor, visited, topo_rev)
+                build_topo(ancestor, visited, topo_rev)
             }
         }
         topo_rev.push(node.clone())
@@ -124,12 +125,8 @@ impl Value {
         self.borrow().grad
     }
 
-    pub fn to_string(&self) -> String {
-        let grad = match self.borrow().grad {
-            Some(x) => format!("{x:.PRECISION$}"),
-            None => "None".to_string(),
-        };
-        format!("data: {:.PRECISION$}\ngrad: {:.PRECISION$}", self.data(), grad)
+    pub fn zero_grad(&self) {
+        self.borrow_mut().grad = None
     }
 
     pub fn pow<T: Into<Value>>(&self, exponent: T) -> Value {
@@ -160,15 +157,19 @@ impl Value {
         Value::new(data, Some(prev_nodes), Some(backward_fn))
     }
 
+    pub fn exp(&self) -> Value {
+        Value::from(f64::consts::E).pow(self.clone())
+    }
+
     pub fn backward(&self) {
         // Topological order means for all directed edges  parent->child, parent appears first
         // To easily satisfy this property, we add each child, then add its parents, and reverse the whole list at the end
 
-        let visited = &mut HashSet::new(); // For quick lookup
-        let topo_rev = &mut Vec::new(); // The actual topological order
+        let mut visited = HashSet::new(); // For quick lookup
+        let mut topo_rev = Vec::new(); // The actual topological order
 
         // // start the recursion
-        build_topo(&self, visited, topo_rev);
+        build_topo(self, &mut visited, &mut topo_rev);
 
         self.borrow_mut().grad = Some(1.0);
         for v in topo_rev.iter().rev() {

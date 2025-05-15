@@ -1,43 +1,23 @@
 pub mod engine;
+pub use engine::Value;
+
 pub mod nn;
+
 pub mod ops;
 pub mod utils;
-pub use engine::Value;
+
 pub mod optim;
 pub use optim::{Optim, SGD};
 
 #[cfg(test)]
 mod tests {
     use crate::engine::Value;
-    use crate::nn::MLP;
-    use crate::nn::Trainer;
-    use crate::nn::cross_entropy;
-    use crate::{assert_close, assert_not_close};
+    use crate::nn::{MLP, Trainer};
+    use crate::utils::make_binary_classification;
+    use crate::{SGD, assert_close, assert_not_close};
     use anyhow::Result;
     use paste::paste;
-    use rand;
-    use rand_distr::{Distribution, Normal};
     use tch::Tensor;
-
-    fn fake_data() -> (Vec<f64>, Vec<u8>) {
-        let n = 1000;
-        let mut rng = rand::rng();
-        let mut data: Vec<f64> = Vec::with_capacity(2 * n);
-        let mut labels: Vec<u8> = Vec::with_capacity(2 * n);
-
-        // class 0
-        let normal = Normal::new(0.0, 1.0).unwrap();
-
-        data.extend(normal.sample_iter(&mut rng).take(n));
-        labels.extend(vec![0u8; n]);
-
-        // class 1
-        let normal = Normal::new(2.0, 1.0).unwrap();
-        data.extend(normal.sample_iter(&mut rng).take(n));
-        labels.extend(vec![0u8; n]);
-
-        (data, labels)
-    }
 
     #[test]
     fn test_tools() {
@@ -79,16 +59,6 @@ mod tests {
     test_op_data!(5.0, 6.0, sub, -, -1.0);
     test_op_data!(5.0, 6.0, mul, *, 30.0);
     test_op_data!(5.0, 6.0, div, /, 5./6.);
-
-    #[test]
-    fn test_mlp() {
-        let (data, labels) = fake_data();
-        let mlp = MLP::new();
-        let trainer = Trainer::new(mlp, None).fit(&data, &labels);
-
-        let logits = mlp.forward(data);
-        let loss = cross_entropy(&labels, &logits);
-    }
 
     #[test]
     fn verify_hashset_behavior() {

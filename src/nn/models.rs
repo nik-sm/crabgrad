@@ -1,10 +1,9 @@
 use crate::engine::Value;
 use crate::nn::cross_entropy_single;
-use crate::optim::{ADAM, Optim, OptimType, SGD};
+use crate::optim::Optim;
 use crate::utils::try_init_logging;
 use anyhow::{Result, bail};
 use itertools::Itertools;
-use log::Level;
 use rand::rng;
 use rand::seq::SliceRandom;
 use rand_distr::{Distribution, Normal};
@@ -19,7 +18,7 @@ pub trait Module {
 
     fn parameters(&self) -> Vec<&Value>;
 
-    fn forward(&self, data: &Vec<Value>) -> Result<Vec<Value>>;
+    fn forward(&self, data: &[Value]) -> Result<Vec<Value>>;
 }
 
 pub struct Neuron {
@@ -38,7 +37,7 @@ impl Neuron {
 }
 
 impl Module for Neuron {
-    fn forward(&self, data: &Vec<Value>) -> Result<Vec<Value>> {
+    fn forward(&self, data: &[Value]) -> Result<Vec<Value>> {
         if self.weights.len() != data.len() {
             bail!("shape mismatch")
         }
@@ -58,7 +57,7 @@ impl Module for Neuron {
     }
 
     fn parameters(&self) -> Vec<&Value> {
-        self.weights.iter().chain(self.bias.as_ref().into_iter()).collect()
+        self.weights.iter().chain(self.bias.as_ref()).collect()
     }
 }
 
@@ -72,8 +71,8 @@ impl Layer {
 }
 
 impl Module for Layer {
-    fn forward(&self, data: &Vec<Value>) -> Result<Vec<Value>> {
-        self.neurons.iter().map(|neuron| neuron.forward(&data)).collect()
+    fn forward(&self, data: &[Value]) -> Result<Vec<Value>> {
+        self.neurons.iter().map(|neuron| neuron.forward(data)).flatten_ok().collect()
     }
 
     fn parameters(&self) -> Vec<&Value> {
@@ -94,7 +93,7 @@ impl MLP {
 
         // For all_dims.len() == n, always n-1 layers total
         for (idx, (d1, d2)) in all_dims.tuple_windows().enumerate() {
-            let relu = if idx < n { true } else { false };
+            let relu = idx < n;
             layers.push(Layer::new(d1, d2, bias, relu))
         }
 
@@ -103,12 +102,14 @@ impl MLP {
 }
 
 impl Module for MLP {
-    fn forward(&self, data: &Vec<Value>) -> Result<Vec<Value>> {
-        let mut result = data;
-        for layer in self.layers.iter() {
-            result = layer.forward(result)?;
+    fn forward(&self, data: &[Value]) -> Result<Vec<Value>> {
+        let mut prev: &[Value] = data;
+        let mut next: Vec<Value> = vec![];
+        for layer in &self.layers {
+            next = layer.forward(prev)?;
+            prev = &next;
         }
-        Ok(result)
+        Ok(next.clone())
     }
 
     fn parameters(&self) -> Vec<&Value> {
@@ -127,21 +128,25 @@ impl<'a> Trainer<'a> {
         Trainer { model, epochs, optim, batch_size }
     }
 
-    pub fn fit(&mut self, mut data_labels: Vec<(Vec<f64>, i64)>) -> Result<()> {
+    pub fn fit(&self, data_labels: impl IntoIterator<Item = (Vec<f64>, i64)>) -> Result<()> {
         // Convert data and labels to Values as needed
-        try_init_logging()?;
+        let mut data_labels = data_labels.into_iter().collect::<Vec<_>>();
+        if let Err(e) = try_init_logging() {
+            eprintln!("Error while setting up logging: {e}")
+        }
 
         let mut rng = rng();
         for e in 0..self.epochs {
             data_labels.shuffle(&mut rng);
-            log::info!("{}", format!("{:-^10}!", format!("Epoch {e}")));
+            log::info!("{:-^20}", format!("Epoch {e}"));
             for (batch_idx, chunk) in data_labels.iter().chunks(self.batch_size).into_iter().enumerate() {
-                log::info!("Batch {batch_idx}");
+                log::info!("\tBatch {batch_idx}");
 
                 self.optim.zero_grad();
 
                 let mut loss = Value::from(0.0);
-                for (data, label) in chunk {
+                for (item_idx, (data, label)) in chunk.enumerate() {
+                    log::info!("\t\tItem {item_idx}");
                     let data: Vec<Value> = data.iter().map(Value::from).collect();
                     let label: Value = Value::from(label);
                     let logits: Vec<Value> = self.model.forward(&data)?;

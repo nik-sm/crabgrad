@@ -2,6 +2,7 @@
 name = "micrograd-rs"
 version = "0.1.0"
 edition = "2024"
+resolver = "3"
 
 [dependencies]
 anyhow = "1.0.98"
@@ -13,4 +14,10 @@ log = "0.4.27"
 paste = "1.0.15"
 rand = "0.9.1"
 rand_distr = "0.5.1"
+
+[dev-dependencies]
 tch = "0.20.0"
+
+[[bin]]
+name = "mlp"
+path = "examples/main.rs"

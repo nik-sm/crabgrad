@@ -2,7 +2,10 @@ use anyhow::Result;
 use chrono::Local;
 use colored::Colorize;
 use env_logger::{Builder, Env};
+use itertools::Itertools;
 use log::Level;
+use rand;
+use rand_distr::{Distribution, Normal};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -32,7 +35,7 @@ pub fn try_init_logging() -> Result<()> {
                 Level::Error => (240, 80, 120),
             };
             // A bit wasteful, but looks nice: string interpolate, then add brackets, then pad, then colorize
-            let level_str = format!("[{}]", level.to_string());
+            let level_str = format!("[{}]", level);
             let level_final = format!("{L:<7}", L = level_str).truecolor(level_color.0, level_color.1, level_color.2);
 
             let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string().truecolor(120, 120, 120);
@@ -64,11 +67,11 @@ pub const DEFAULT_ATOL: f64 = 1e-8;
 #[macro_export]
 macro_rules! assert_close {
     ($left:expr, $right:expr) => {
-        assert_close!($left, $right, $crate::util::DEFAULT_RTOL, $crate::util::DEFAULT_ATOL)
+        assert_close!($left, $right, $crate::utils::DEFAULT_RTOL, $crate::utils::DEFAULT_ATOL)
     };
     ($left:expr, $right:expr, $rtol:expr, $atol:expr) => {
         assert!(
-            $crate::util::is_close($left, $right, $rtol, $atol),
+            $crate::utils::is_close($left, $right, $rtol, $atol),
             "assertion failed: `is_close(left, right)`\n  left: `{:?}`\n right: `{:?}`\n rtol: `{:?}`\n atol: `{:?}`",
             $left,
             $right,
@@ -81,11 +84,11 @@ macro_rules! assert_close {
 #[macro_export]
 macro_rules! assert_not_close {
     ($left:expr, $right:expr) => {
-        assert_not_close!($left, $right, $crate::util::DEFAULT_RTOL, $crate::util::DEFAULT_ATOL)
+        assert_not_close!($left, $right, $crate::utils::DEFAULT_RTOL, $crate::utils::DEFAULT_ATOL)
     };
     ($left:expr, $right:expr, $rtol:expr, $atol:expr) => {
         assert!(
-            !$crate::util::is_close($left, $right, $rtol, $atol),
+            !$crate::utils::is_close($left, $right, $rtol, $atol),
             "assertion failed: `is_close(left, right)`\n  left: `{:?}`\n right: `{:?}`\n rtol: `{:?}`\n atol: `{:?}`",
             $left,
             $right,
@@ -93,6 +96,43 @@ macro_rules! assert_not_close {
             $atol
         )
     };
+}
+
+pub fn make_binary_classification(n_samples_each_class: usize, n_features: usize) -> (Vec<Vec<f64>>, Vec<i64>) {
+    let mut rng = rand::rng();
+    let mut data: Vec<Vec<f64>> = Vec::with_capacity(2 * n_samples_each_class * n_features);
+    let mut labels: Vec<i64> = Vec::with_capacity(2 * n_samples_each_class);
+
+    // NOTE - simple approach; spherical gaussians aligned on the diagonal line y = x1 + x2 + x3 + ...
+
+    // class 0
+    let normal = Normal::new(0.0, 1.0).unwrap();
+
+    data.extend(
+        normal
+            .sample_iter(&mut rng)
+            .take(n_samples_each_class * n_features)
+            .chunks(n_features)
+            .into_iter()
+            .map(|chunk| chunk.collect())
+            .collect::<Vec<Vec<_>>>(),
+    );
+    labels.extend(vec![0i64; n_samples_each_class]);
+
+    // class 1
+    let normal = Normal::new(2.0, 1.0).unwrap();
+    data.extend(
+        normal
+            .sample_iter(&mut rng)
+            .take(n_samples_each_class * n_features)
+            .chunks(n_features)
+            .into_iter()
+            .map(|chunk| chunk.collect())
+            .collect::<Vec<Vec<_>>>(),
+    );
+    labels.extend(vec![1i64; n_samples_each_class]);
+
+    (data, labels)
 }
 
 #[cfg(test)]
