@@ -11,7 +11,7 @@ const PRECISION: usize = 3;
 pub struct ValueInner {
     pub data: f64,
     pub grad: Option<f64>,
-    pub backward_fn: Option<fn() -> f64>,
+    pub backward_fn: Option<fn(&ValueInner)>,
     pub prev_nodes: Option<Vec<Value>>,
 }
 
@@ -46,8 +46,8 @@ impl Hash for Value {
 }
 
 impl ValueInner {
-    pub fn new(data: f64, grad: Option<f64>, backward_fn: Option<fn() -> f64>, prev_nodes: Option<Vec<Value>>) -> Self {
-        ValueInner { data, grad, backward_fn, prev_nodes }
+    pub fn new(data: f64, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
+        ValueInner { data, grad: None, prev_nodes, backward_fn }
     }
 }
 impl From<f64> for ValueInner {
@@ -78,8 +78,8 @@ fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Val
 }
 
 impl Value {
-    pub fn new(data: f64, grad: Option<f64>, backward_fn: Option<fn() -> f64>, prev_nodes: Option<Vec<Value>>) -> Self {
-        Value(Rc::new(RefCell::new(ValueInner::new(data, grad, backward_fn, prev_nodes))))
+    pub fn new(data: f64, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
+        Value(Rc::new(RefCell::new(ValueInner::new(data, prev_nodes, backward_fn))))
     }
 
     pub fn data(&self) -> f64 {
@@ -94,22 +94,34 @@ impl Value {
         format!("data: {:.PRECISION$}\ngrad: {:.PRECISION$}", self.data(), grad)
     }
 
-    // pub fn pow(&self, n: f64) -> Value {
-    //     Value::new(self.data().powf(n))
-    //     /*
+    pub fn pow<T: Into<Value>>(&self, exponent: T) -> Value {
+        let exponent = exponent.into();
 
-    //     def __pow__(self, other):
-    //         assert isinstance(other, (int, float)), "only supporting int/float powers for now"
-    //         out = Value(self.data**other, (self,), f'**{other}')
+        let data = self.data().powf(exponent.data());
+        let prev_nodes = vec![self.clone(), exponent.clone()];
+        let backward_fn = |our_value_inner: &ValueInner| {
+            // TODO - left off here
+            match our_value_inner.prev_nodes.as_deref() {
+                Some([base, exponent]) => {
+                    let mut base = base.borrow_mut();
+                    let mut exponent = exponent.borrow_mut();
+                    let our_grad = our_value_inner.grad.unwrap_or(0.0);
+                    // deriv of f = a ^ b   w.r.t.   a
+                    base.grad =
+                        Some(base.grad.unwrap_or(0.0) + exponent.data * base.data.powf(exponent.data - 1.0) * our_grad);
+                    // deriv of f = a ^ b   w.r.t.   b
+                    exponent.grad =
+                        Some(exponent.grad.unwrap_or(0.0) + base.data.powf(exponent.data) * base.data.ln() * our_grad);
+                }
+                _ => {
+                    unreachable!("binary op must have two ancestors")
+                }
+            }
+        };
 
-    //         def _backward():
-    //             self.grad += (other * self.data**(other-1)) * out.grad
-    //         out._backward = _backward
+        Value::new(data, Some(prev_nodes), Some(backward_fn))
+    }
 
-    //         return out
-
-    //      */
-    // }
     pub fn backwards(&self) {
         // Topological order means for all directed edges  parent->child, parent appears first
         // To easily satisfy this property, we add each child, then add its parents, and reverse the whole list at the end
@@ -122,10 +134,8 @@ impl Value {
 
         self.borrow_mut().grad = Some(1.0);
         for v in topo_rev.iter().rev() {
-            let mut v = v.borrow_mut();
-            match v.backward_fn {
-                None => {}
-                Some(f) => v.grad = Some(f()),
+            if let Some(backprop) = &v.borrow().backward_fn {
+                backprop(&v.borrow());
             }
         }
     }
@@ -136,30 +146,85 @@ impl Value {
 }
 
 macro_rules! impl_binary_op {
-    ($trait:ident, $method:ident, $operator:tt) =>
+    ($self:ident, $rhs:ident, $trait:ident, $method:ident, $operator:tt, $body:tt) =>
     (
-        // Implement where Value is on LHS or both operands are Value
-        impl<T> $trait<T> for Value
-        where T: Into<Value>,
+
+        // Value on both sides
+        impl $trait for Value
         {
             type Output = Self;
-            fn $method(self, rhs: T) -> Self {
-                Value::from(self.data() $operator rhs.into().data())
+            fn $method($self, $rhs: Self) -> Self {
+                $body
             }
         }
 
-        // Implement where Value is on RHS
+        // Value on RHS
         impl $trait<Value> for f64 {
             type Output = Value;
             fn $method(self, rhs: Value) -> Value {
-                Value::from(self $operator rhs.data())
+                Value::from(self) $operator rhs
+            }
+        }
+
+        // Value on LHS
+        impl $trait<f64> for Value {
+            type Output = Self;
+            fn $method(self, rhs: f64) -> Self {
+                self $operator Value::from(rhs)
+            }
+        }
+
+        // Method-call style
+        impl Value {
+            fn $method<T: Into<Value>>(self, rhs: T) -> Self {
+                self $operator rhs.into()
             }
         }
     )
 }
 
-impl_binary_op!(Add, add, +);
-impl_binary_op!(Mul, mul, *);
-impl_binary_op!(Div, div, /);
-impl_binary_op!(Sub, sub, -);
+impl_binary_op!(self, rhs, Add, add, +, {
+    let data = self.data() + rhs.data();
+    let prev_nodes = vec![self.clone(), rhs.clone()];
+    let backward_fn = |our_value_inner: &ValueInner| {
+        match our_value_inner.prev_nodes.as_deref() {
+            Some([first, second]) => {
+                let mut first = first.borrow_mut();
+                let mut second = second.borrow_mut();
+                let our_grad = our_value_inner.grad.unwrap_or(0.0);
+                first.grad = Some(first.grad.unwrap_or(0.0) + our_grad);
+                second.grad = Some(second.grad.unwrap_or(0.0) + our_grad);
+            },
+            _ => {
+                unreachable!("binary op must have two ancestors")
+            }
+        }
+    };
+    Value::new(data, Some(prev_nodes), Some(backward_fn))
+}
+);
+impl_binary_op!(self, rhs, Mul, mul, *, {
+    let data = self.data() * rhs.data();
+    let prev_nodes = vec![self.clone(), rhs.clone()];
+    let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
+        Some([first, second]) => {
+            let mut first = first.borrow_mut();
+            let mut second = second.borrow_mut();
+            let our_grad = our_value_inner.grad.unwrap_or(0.0);
+            first.grad = Some(first.grad.unwrap_or(0.0) + second.data * our_grad);
+            second.grad = Some(second.grad.unwrap_or(0.0) + first.data * our_grad);
+        }
+        _ => {
+            unreachable!("binary op must have two ancestors")
+        }
+    };
+    Value::new(data, Some(prev_nodes), Some(backward_fn))
+});
+impl_binary_op!(self, rhs, Div, div, /, {
+    self * rhs.pow(-1.0)
+});
+impl_binary_op!(self, rhs, Sub, sub, -, {
+    self + (-1.0 * rhs)
+});
+
 // TODO - also impl +=, -=, etc
