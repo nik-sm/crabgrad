@@ -1,6 +1,5 @@
 use crate::engine::Value;
 use itertools::Itertools;
-use rand::Rng;
 use rand_distr::{Distribution, Normal};
 
 pub trait Module {

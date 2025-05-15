@@ -205,36 +205,40 @@ macro_rules! impl_binary_op {
         impl $trait<f64> for Value {
             type Output = Self;
             fn $method(self, rhs: f64) -> Self {
-                self $operator Value::from(rhs)
+                self.clone() $operator Self::from(rhs)
             }
         }
         impl $trait<i64> for Value {
             type Output = Self;
             fn $method(self, rhs: i64) -> Self {
-                self $operator Value::from(rhs)
+                self.clone() $operator Self::from(rhs)
             }
         }
 
         // Method-call style
         impl Value {
-            fn $method<T: Into<Value>>(self, rhs: T) -> Self {
-                self $operator rhs.into()
+            fn $method<T: Into<Self>>(&self, rhs: T) -> Self {
+                self.clone() $operator rhs.into()
             }
         }
     )
 }
 
+// NOTE - careful about borrow muts, since both LHS and RHS could be same Value
+// Thus, need to finish dealing with LHS before dealing with RHS
 impl_binary_op!(self, rhs, Add, add, +, {
     let data = self.data() + rhs.data();
     let prev_nodes = vec![self.clone(), rhs.clone()];
     let backward_fn = |our_value_inner: &ValueInner| {
         match our_value_inner.prev_nodes.as_deref() {
             Some([first, second]) => {
-                let mut first = first.borrow_mut();
-                let mut second = second.borrow_mut();
                 let our_grad = our_value_inner.grad.unwrap_or(0.0);
-                first.grad = Some(first.grad.unwrap_or(0.0) + our_grad);
-                second.grad = Some(second.grad.unwrap_or(0.0) + our_grad);
+
+                let first_grad = first.grad().unwrap_or(0.0);
+                first.borrow_mut().grad = Some(first_grad + our_grad);
+
+                let second_grad = second.grad().unwrap_or(0.0);
+                second.borrow_mut().grad = Some(second_grad + our_grad);
             },
             _ => {
                 unreachable!("binary op must have two ancestors")
@@ -249,11 +253,13 @@ impl_binary_op!(self, rhs, Mul, mul, *, {
     let prev_nodes = vec![self.clone(), rhs.clone()];
     let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
         Some([first, second]) => {
-            let mut first = first.borrow_mut();
-            let mut second = second.borrow_mut();
             let our_grad = our_value_inner.grad.unwrap_or(0.0);
-            first.grad = Some(first.grad.unwrap_or(0.0) + second.data * our_grad);
-            second.grad = Some(second.grad.unwrap_or(0.0) + first.data * our_grad);
+
+            let first_grad = first.grad().unwrap_or(0.0);
+            first.borrow_mut().grad = Some(first_grad + second.data() * our_grad);
+
+            let second_grad = second.grad().unwrap_or(0.0);
+            second.borrow_mut().grad = Some(second_grad + first.data() * our_grad);
         }
         _ => {
             unreachable!("binary op must have two ancestors")
@@ -268,4 +274,4 @@ impl_binary_op!(self, rhs, Sub, sub, -, {
     self + (-1.0 * rhs)
 });
 
-// TODO - also impl +=, -=, etc
+// TODO - also impl +=, -=, etc, unary ops
