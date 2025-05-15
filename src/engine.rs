@@ -141,7 +141,20 @@ impl Value {
     }
 
     pub fn relu(&self) -> Value {
-        Value::from(if self.data() < 0.0 { 0.0 } else { self.data() })
+        let data = if self.data() <= 0.0 { 0.0 } else { self.data() };
+        let prev_nodes = vec![self.clone()];
+        let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
+            Some([first]) => {
+                let mut first = first.borrow_mut();
+                let our_grad = our_value_inner.grad.unwrap_or(0.0);
+                let multiplier = if first.data > 0.0 { 1.0 } else { 0.0 };
+                first.grad = Some(first.grad.unwrap_or(0.0) + multiplier * our_grad);
+            }
+            _ => {
+                unreachable!("relu must have one ancestors")
+            }
+        };
+        Value::new(data, Some(prev_nodes), Some(backward_fn))
     }
 }
 
