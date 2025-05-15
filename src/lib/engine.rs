@@ -285,12 +285,29 @@ impl_binary_op!(self, rhs, Sub, sub, _sub, -, {
     self + (-1.0 * rhs)
 });
 
+// TODO - using these functions to implement Neuron.normalize was extremely slow - why?
+pub fn sum(values: &[Value]) -> Value {
+    values.iter().fold(Value::from(0.0), |acc, val| acc + val)
+}
+
+pub fn prod(values: &[Value]) -> Value {
+    values.iter().fold(Value::from(1.0), |acc, val| acc * val)
+}
+
+pub fn pow<T: Clone + Into<Value>>(values: &[Value], exponent: T) -> Vec<Value> {
+    values.iter().map(|value| value.pow(exponent.clone().into())).collect()
+}
+
+pub fn norm(values: &[Value]) -> Value {
+    sum(&pow(values, 2)).pow(0.5)
+}
+
 // TODO - also impl +=, -=, etc, unary ops
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_close;
+    use crate::{assert_close, assert_vec_close};
     use anyhow::Result;
     use paste::paste;
     use tch::Tensor;
@@ -460,5 +477,32 @@ mod tests {
         let clone = node.clone();
         assert!(node == clone);
         assert!(visited.contains(&clone));
+    }
+
+    #[test]
+    fn test_sum() {
+        let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
+        assert_close!(sum(&values).data(), 4.0)
+    }
+
+    #[test]
+    fn test_prod() {
+        let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
+        assert_close!(prod(&values).data(), -6.0)
+    }
+
+    #[test]
+    fn test_pow() {
+        let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
+        assert_vec_close!(pow(&values, 2.0), vec![Value::from(4.0), Value::from(9.0), Value::from(1.0)])
+    }
+
+    #[test]
+    fn test_norm() {
+        let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
+        assert_close!(
+            norm(&values).data(),
+            values.iter().map(|v| v.pow(2.0)).fold(0.0, |acc, val| acc + val.data()).sqrt()
+        )
     }
 }

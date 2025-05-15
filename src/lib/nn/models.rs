@@ -35,6 +35,7 @@ pub trait Classifier: Module {
 }
 impl Classifier for MLP {}
 
+#[derive(Debug)]
 pub struct Neuron {
     weights: Vec<Value>,
     bias: Option<Value>,
@@ -47,6 +48,15 @@ impl Neuron {
         let weights: Vec<Value> = gaussian.sample_iter(&mut rng).take(in_dim).map(Value::from).collect();
         let bias = if bias { Some(Value::from(gaussian.sample(&mut rng))) } else { None };
         Self { weights, bias, relu }
+    }
+
+    fn normalize(&mut self) {
+        // TODO - this approach was extremely slow - why?
+        // let norm = norm(&self.weights);
+        // self.weights = self.weights.iter().map(|w| w / norm.clone()).collect();
+
+        let norm = self.weights.iter().fold(0.0, |acc, val| acc + val.data().powf(2.0)).sqrt();
+        self.weights.iter().for_each(|p| p.borrow_mut().data = p.data() / norm);
     }
 }
 
@@ -75,12 +85,19 @@ impl Module for Neuron {
     }
 }
 
+#[derive(Debug)]
 pub struct Layer {
     neurons: Vec<Neuron>,
 }
 impl Layer {
     fn new(in_dim: usize, out_dim: usize, bias: bool, relu: bool) -> Self {
         Self { neurons: (0..out_dim).map(|_| Neuron::new(in_dim, bias, relu)).collect() }
+    }
+
+    fn normalize(&mut self) {
+        for neuron in &mut self.neurons {
+            neuron.normalize();
+        }
     }
 }
 
@@ -94,6 +111,7 @@ impl Module for Layer {
     }
 }
 
+#[derive(Debug)]
 pub struct MLP {
     layers: Vec<Layer>,
 }
@@ -113,6 +131,12 @@ impl MLP {
         }
 
         Self { layers }
+    }
+
+    fn normalize(&mut self) {
+        for layer in &mut self.layers {
+            layer.normalize();
+        }
     }
 }
 
@@ -135,16 +159,55 @@ impl Module for MLP {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::{norm, sum};
     use crate::{Optim, optim::SGD};
     use crate::{assert_close, assert_not_close};
     use anyhow::Result;
 
     #[test]
-    fn test_neuron() -> Result<()> {
-        // Check that a single layer will move as expected
+    fn test_neuron_normalize() {
+        let mut n = Neuron::new(3, false, false);
+        assert_not_close!(norm(&n.weights).data(), 1.0);
+        n.normalize();
+        assert_close!(norm(&n.weights).data(), 1.0);
+    }
+
+    #[test]
+    fn test_layer_normalize() {
+        let mut layer = Layer::new(3, 2, false, false);
+        for n in &layer.neurons {
+            assert_not_close!(norm(&n.weights).data(), 1.0);
+        }
+        layer.normalize();
+        for n in &layer.neurons {
+            assert_close!(norm(&n.weights).data(), 1.0);
+        }
+    }
+
+    #[test]
+    fn test_mlp_normalize() {
+        let mut mlp = MLP::new(3, vec![3, 2], 2, false);
+        for layer in &mlp.layers {
+            for n in &layer.neurons {
+                assert_not_close!(norm(&n.weights).data(), 1.0);
+            }
+        }
+        mlp.normalize();
+        for layer in &mlp.layers {
+            for n in &layer.neurons {
+                assert_close!(norm(&n.weights).data(), 1.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_neuron_sgd() -> Result<()> {
+        // Check that a single neuron will move as expected
         // We multiply with a fixed vector, and keep re-normalizing the layer weights to a unit vector
         // The neuron's weights should move towards being aligned
-        let n = Neuron::new(3, false, false);
+        let mut n = Neuron::new(3, false, false);
+        // n.normalize();
+
         let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
 
         let optim = SGD::new(n.parameters(), 0.1);
@@ -155,6 +218,7 @@ mod tests {
         assert_not_close!(before[2].data(), 0.0);
 
         for _ in 0..1000 {
+            // println!("{i}");
             // Move param vector towards being a unit vector aligned with the data
             let out = n.forward(&x)?.get(0).unwrap().to_owned();
             let loss = 1 - out;
@@ -164,25 +228,64 @@ mod tests {
             optim.step();
 
             // Normalize to unit length
-            let norm = n.parameters().iter().fold(0.0, |acc, val| acc + val.data().powf(2.0)).sqrt();
-            n.parameters().iter().for_each(|p| p.borrow_mut().data = p.data() / norm);
+            n.normalize();
         }
 
         let after = n.parameters();
-        dbg!(&after);
+
         assert_close!(after[0].data(), 1.0);
         assert_close!(after[1].data(), 0.0);
         assert_close!(after[2].data(), 0.0);
+
         Ok(())
     }
 
     #[test]
-    fn test_layer() {
-        todo!()
-    }
+    fn test_layer_sgd() -> Result<()> {
+        // Check that each neuron in a single layer will move as expected
+        // Same strategy as used for single neuron case
+        let mut layer = Layer::new(3, 2, false, false);
+        layer.normalize();
 
-    #[test]
-    fn test_mlp() {
-        todo!()
+        let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
+
+        let optim = SGD::new(layer.parameters(), 0.1);
+
+        let neuron_0 = &layer.neurons[0];
+        assert_not_close!(neuron_0.parameters()[0].data(), 1.0);
+        assert_not_close!(neuron_0.parameters()[1].data(), 0.0);
+        assert_not_close!(neuron_0.parameters()[2].data(), 0.0);
+
+        let neuron_1 = &layer.neurons[1];
+        assert_not_close!(neuron_1.parameters()[0].data(), 1.0);
+        assert_not_close!(neuron_1.parameters()[1].data(), 0.0);
+        assert_not_close!(neuron_1.parameters()[2].data(), 0.0);
+
+        for _ in 0..1000 {
+            // Move param vector towards being a unit vector aligned with the data
+            let out = layer.forward(&x)?;
+            let loss = 1 - sum(&out);
+
+            optim.zero_grad();
+            loss.backward();
+            optim.step();
+
+            // Normalize to unit length
+            layer.normalize();
+        }
+
+        let neuron_0 = &layer.neurons[0];
+        dbg!(&neuron_0);
+        assert_close!(neuron_0.parameters()[0].data(), 1.0);
+        assert_close!(neuron_0.parameters()[1].data(), 0.0);
+        assert_close!(neuron_0.parameters()[2].data(), 0.0);
+
+        let neuron_1 = &layer.neurons[1];
+        dbg!(&neuron_1);
+        assert_close!(neuron_1.parameters()[0].data(), 1.0);
+        assert_close!(neuron_1.parameters()[1].data(), 0.0);
+        assert_close!(neuron_1.parameters()[2].data(), 0.0);
+
+        Ok(())
     }
 }

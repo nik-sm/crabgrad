@@ -101,6 +101,16 @@ macro_rules! assert_not_close {
     };
 }
 
+#[macro_export]
+macro_rules! assert_vec_close {
+    ($left:expr, $right:expr) => {
+        $left.iter().zip($right).for_each(|(l, r)| assert_close!(l.data(), r.data()))
+    };
+    ($left:expr, $right:expr, $rtol:expr, $atol:expr) => {
+        $left.iter().zip($right).for_each(|(l, r)| assert_close!(l.data(), r.data(), $rtol, $atol))
+    };
+}
+
 pub fn make_binary_classification(
     n_samples_each_class: usize,
     n_features: usize,

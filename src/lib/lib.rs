@@ -1,5 +1,5 @@
 pub mod engine;
-pub use engine::{DiscreteLabel, FloatDataScalar, IntDataScalar, Value, argmax};
+pub use engine::{DiscreteLabel, FloatDataScalar, IntDataScalar, Value, argmax, norm, pow, prod, sum};
 
 pub mod nn;
 

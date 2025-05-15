@@ -125,10 +125,12 @@ mod tests {
         // Try once with torch
         let vs = tch::nn::VarStore::new(tch::Device::Cpu);
 
-        let logits_a_t = (vs.root() / "foo").ones("foo", &[2]);
+        let logits_a_t = Tensor::ones(2, (tch::Kind::Float, vs.device()));
+        let logits_a_t = vs.root().add("bar", logits_a_t, true);
         let y_true_a_t = Tensor::from(0i64);
 
-        let logits_b_t = (vs.root() / "bar").ones("bar", &[2]) * Tensor::from(3.0);
+        let logits_b_t = Tensor::ones(2, (tch::Kind::Float, vs.device())) * 3.0;
+        let logits_b_t = vs.root().add("bar", logits_b_t, true);
         let y_true_b_t = Tensor::from(1i64);
 
         let loss_a_t = logits_a_t.cross_entropy_for_logits(&y_true_a_t);
@@ -137,7 +139,7 @@ mod tests {
         let mut optim_t = tch::nn::sgd(0.0, 0.0, 0.0, false).build(&vs, 1e-3)?;
         optim_t.zero_grad();
         let loss_t = Tensor::from(0.0) + &loss_a_t + &loss_b_t;
-        optim_t.backward_step(&loss_a_t);
+        optim_t.backward_step(&loss_t);
 
         assert_close!(loss.data(), loss_t.double_value(&[]));
 
@@ -145,7 +147,7 @@ mod tests {
         dbg!(&logits_a);
         dbg!(&logits_b);
         dbg!(&logits_a_t);
-        dbg!(&logits_b_t); // TODO - ours is fine, theirs is wrong!
+        dbg!(&logits_b_t);
         assert_close!(logits_a[0].grad().unwrap(), logits_a_t.grad().double_value(&[0]));
         assert_close!(logits_a[1].grad().unwrap(), logits_a_t.grad().double_value(&[1]));
 
