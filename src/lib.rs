@@ -1,8 +1,10 @@
 pub mod engine;
 pub mod nn;
 pub mod ops;
-pub mod util;
+pub mod utils;
 pub use engine::Value;
+pub mod optim;
+pub use optim::{Optim, SGD};
 
 #[cfg(test)]
 mod tests {
@@ -15,7 +17,7 @@ mod tests {
     use paste::paste;
     use rand;
     use rand_distr::{Distribution, Normal};
-    use tch::{Scalar, Tensor};
+    use tch::Tensor;
 
     fn fake_data() -> (Vec<f64>, Vec<u8>) {
         let n = 1000;
@@ -78,15 +80,15 @@ mod tests {
     test_op_data!(5.0, 6.0, mul, *, 30.0);
     test_op_data!(5.0, 6.0, div, /, 5./6.);
 
-    // #[test]
-    // fn test_mlp() {
-    //     let (data, labels) = fake_data();
-    //     let mlp = MLP::new();
-    //     let trainer = Trainer::new(mlp, None).fit(&data, &labels);
+    #[test]
+    fn test_mlp() {
+        let (data, labels) = fake_data();
+        let mlp = MLP::new();
+        let trainer = Trainer::new(mlp, None).fit(&data, &labels);
 
-    //     let logits = mlp.forward(data);
-    //     let loss = cross_entropy(&labels, &logits);
-    // }
+        let logits = mlp.forward(data);
+        let loss = cross_entropy(&labels, &logits);
+    }
 
     #[test]
     fn verify_hashset_behavior() {

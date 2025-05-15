@@ -31,9 +31,19 @@ impl From<f64> for Value {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
+impl From<&f64> for Value {
+    fn from(data: &f64) -> Self {
+        Self(Rc::new(RefCell::new(ValueInner::from(data))))
+    }
+}
 
 impl From<i64> for Value {
     fn from(data: i64) -> Self {
+        Self(Rc::new(RefCell::new(ValueInner::from(data))))
+    }
+}
+impl From<&i64> for Value {
+    fn from(data: &i64) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
@@ -57,14 +67,26 @@ impl ValueInner {
         ValueInner { data, grad: None, prev_nodes, backward_fn }
     }
 }
+
 impl From<f64> for ValueInner {
     fn from(data: f64) -> Self {
         ValueInner { data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
+impl From<&f64> for ValueInner {
+    fn from(data: &f64) -> Self {
+        ValueInner { data: *data, grad: None, backward_fn: None, prev_nodes: None }
+    }
+}
+
 impl From<i64> for ValueInner {
     fn from(data: i64) -> Self {
         ValueInner { data: data as f64, grad: None, backward_fn: None, prev_nodes: None }
+    }
+}
+impl From<&i64> for ValueInner {
+    fn from(data: &i64) -> Self {
+        ValueInner { data: *data as f64, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
