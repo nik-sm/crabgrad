@@ -1,3 +1,4 @@
+use crate::engine::{Dataset, DiscreteLabel, FloatDataScalar};
 use anyhow::Result;
 use chrono::Local;
 use colored::Colorize;
@@ -100,10 +101,13 @@ macro_rules! assert_not_close {
     };
 }
 
-pub fn make_binary_classification(n_samples_each_class: usize, n_features: usize) -> (Vec<Vec<f64>>, Vec<i64>) {
+pub fn make_binary_classification(
+    n_samples_each_class: usize,
+    n_features: usize,
+) -> (Vec<Vec<FloatDataScalar>>, Vec<DiscreteLabel>) {
     let mut rng = rand::rng();
-    let mut data: Vec<Vec<f64>> = Vec::with_capacity(2 * n_samples_each_class * n_features);
-    let mut labels: Vec<i64> = Vec::with_capacity(2 * n_samples_each_class);
+    let mut data: Vec<Vec<FloatDataScalar>> = Vec::with_capacity(2 * n_samples_each_class * n_features);
+    let mut labels: Vec<DiscreteLabel> = Vec::with_capacity(2 * n_samples_each_class);
 
     // NOTE - simple approach; spherical gaussians aligned on the diagonal line y = x1 + x2 + x3 + ...
 
@@ -119,7 +123,7 @@ pub fn make_binary_classification(n_samples_each_class: usize, n_features: usize
             .map(|chunk| chunk.collect())
             .collect::<Vec<Vec<_>>>(),
     );
-    labels.extend(vec![0i64; n_samples_each_class]);
+    labels.extend(vec![0; n_samples_each_class]);
 
     // class 1
     let normal = Normal::new(2.0, 1.0).unwrap();
@@ -132,17 +136,16 @@ pub fn make_binary_classification(n_samples_each_class: usize, n_features: usize
             .map(|chunk| chunk.collect())
             .collect::<Vec<Vec<_>>>(),
     );
-    labels.extend(vec![1i64; n_samples_each_class]);
+    labels.extend(vec![1; n_samples_each_class]);
 
     (data, labels)
 }
 
-pub fn train_test_split<T: Clone>(
-    mut zipped_data_labels: Vec<(Vec<T>, i64)>,
+pub fn train_test_split<X: Clone, Y: Clone>(
+    mut zipped_data_labels: Dataset<X, Y>,
     train_frac: f64,
     test_frac: f64,
-) -> (Vec<(Vec<T>, i64)>, Vec<(Vec<T>, i64)>) {
-    // let mut zipped_data_labels = zipped_data_labels.into_iter().collect::<Vec<_>>();
+) -> (Dataset<X, Y>, Dataset<X, Y>) {
     let mut rng = rand::rng();
     let n_total = zipped_data_labels.len() as f64;
     let n_train = (train_frac / (train_frac + test_frac) * n_total) as usize;
@@ -177,10 +180,26 @@ mod tests {
     #[test]
     fn close1() {
         assert_close!(1.00001, 1.00002);
+        assert_close!(1.0 + 2.0, 3.0);
+        assert_close!(1e-3, 1e-3 + 1e-10);
     }
 
     #[test]
     fn not_close1() {
         assert_not_close!(1.0, 2.0);
+
+        assert_not_close!(1e-3, 2e-3);
+        assert_not_close!(1e-3, 1e-3 + 1e-5);
+    }
+
+    #[test]
+    fn toy_data() {
+        let n_samples_each_class = 10;
+        let n_features = 8;
+        let (data, labels) = make_binary_classification(n_samples_each_class, n_features);
+
+        assert_eq!(data.len(), 2 * n_samples_each_class, "n items");
+        assert_eq!(data[0].len(), n_features, "n features");
+        assert_eq!(labels.len(), 2 * n_samples_each_class);
     }
 }

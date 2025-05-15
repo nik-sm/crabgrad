@@ -22,17 +22,15 @@ impl<'a> Trainer<'a> {
 
     pub fn fit(
         &self,
-        train_data_labels: impl IntoIterator<Item = (Vec<f64>, i64)>,
-        test_data_labels: Option<impl IntoIterator<Item = (Vec<f64>, i64)>>,
+        train_data_labels: impl IntoIterator<Item = (Vec<f64>, usize)>,
+        test_data_labels: Option<impl IntoIterator<Item = (Vec<f64>, usize)>>,
     ) -> Result<()> {
         // Convert data and labels to Values as needed
-        fn to_values(raw: impl IntoIterator<Item = (Vec<f64>, i64)>) -> Vec<(Vec<Value>, i64)> {
-            raw.into_iter()
-                .map(|(xs, y)| (xs.iter().map(|x| Value::from(x)).collect::<Vec<_>>(), y))
-                .collect::<Vec<_>>()
+        fn to_values(raw: impl IntoIterator<Item = (Vec<f64>, usize)>) -> Vec<(Vec<Value>, usize)> {
+            raw.into_iter().map(|(xs, y)| (xs.iter().map(Value::from).collect::<Vec<_>>(), y)).collect::<Vec<_>>()
         }
         let mut train_data_labels = to_values(train_data_labels);
-        let test_data_labels = test_data_labels.map(|x| to_values(x));
+        let test_data_labels = test_data_labels.map(to_values);
 
         if let Err(e) = try_init_logging() {
             eprintln!("Error while setting up logging: {e}")
@@ -72,9 +70,8 @@ impl<'a> Trainer<'a> {
             }
 
             log::info!("Train acc: {}", self.model.score(&train_data_labels)?);
-            match test_data_labels {
-                Some(ref z) => log::info!("Test acc: {}", self.model.score(&z)?),
-                _ => {}
+            if let Some(ref z) = test_data_labels {
+                log::info!("Test acc: {}", self.model.score(z)?)
             }
         }
 

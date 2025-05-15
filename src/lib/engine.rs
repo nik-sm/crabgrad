@@ -7,10 +7,15 @@ use std::ops::{Add, Deref, Div, Mul, Sub};
 use std::ptr;
 use std::rc::Rc;
 
+pub type FloatDataScalar = f64;
+pub type IntDataScalar = i64;
+pub type DiscreteLabel = usize;
+pub type Dataset<X, Y> = Vec<(X, Y)>;
+
 #[derive(Debug, Clone)]
 pub struct ValueInner {
-    pub data: f64,
-    pub grad: Option<f64>,
+    pub data: FloatDataScalar,
+    pub grad: Option<FloatDataScalar>,
     pub backward_fn: Option<fn(&ValueInner)>,
     pub prev_nodes: Option<Vec<Value>>,
 }
@@ -25,24 +30,24 @@ impl Clone for Value {
     }
 }
 
-impl From<f64> for Value {
-    fn from(data: f64) -> Self {
+impl From<FloatDataScalar> for Value {
+    fn from(data: FloatDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
-impl From<&f64> for Value {
-    fn from(data: &f64) -> Self {
+impl From<&FloatDataScalar> for Value {
+    fn from(data: &FloatDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
 
-impl From<i64> for Value {
-    fn from(data: i64) -> Self {
+impl From<IntDataScalar> for Value {
+    fn from(data: IntDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
-impl From<&i64> for Value {
-    fn from(data: &i64) -> Self {
+impl From<&IntDataScalar> for Value {
+    fn from(data: &IntDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
@@ -63,30 +68,30 @@ impl Hash for Value {
 }
 
 impl ValueInner {
-    pub fn new(data: f64, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
+    pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
         ValueInner { data, grad: None, prev_nodes, backward_fn }
     }
 }
 
-impl From<f64> for ValueInner {
-    fn from(data: f64) -> Self {
+impl From<FloatDataScalar> for ValueInner {
+    fn from(data: FloatDataScalar) -> Self {
         ValueInner { data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
-impl From<&f64> for ValueInner {
-    fn from(data: &f64) -> Self {
+impl From<&FloatDataScalar> for ValueInner {
+    fn from(data: &FloatDataScalar) -> Self {
         ValueInner { data: *data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
-impl From<i64> for ValueInner {
-    fn from(data: i64) -> Self {
-        ValueInner { data: data as f64, grad: None, backward_fn: None, prev_nodes: None }
+impl From<IntDataScalar> for ValueInner {
+    fn from(data: IntDataScalar) -> Self {
+        ValueInner { data: data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
-impl From<&i64> for ValueInner {
-    fn from(data: &i64) -> Self {
-        ValueInner { data: *data as f64, grad: None, backward_fn: None, prev_nodes: None }
+impl From<&IntDataScalar> for ValueInner {
+    fn from(data: &IntDataScalar) -> Self {
+        ValueInner { data: *data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
@@ -112,15 +117,15 @@ fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Val
 }
 
 impl Value {
-    pub fn new(data: f64, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
+    pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
         Value(Rc::new(RefCell::new(ValueInner::new(data, prev_nodes, backward_fn))))
     }
 
-    pub fn data(&self) -> f64 {
+    pub fn data(&self) -> FloatDataScalar {
         self.borrow().data
     }
 
-    pub fn grad(&self) -> Option<f64> {
+    pub fn grad(&self) -> Option<FloatDataScalar> {
         self.borrow().grad
     }
 
@@ -165,7 +170,7 @@ impl Value {
     }
 
     pub fn log(&self) -> Value {
-        let data = f64::ln(self.data());
+        let data = FloatDataScalar::ln(self.data());
         let prev_nodes = vec![self.clone()];
         let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
             Some([orig]) => {
@@ -216,7 +221,7 @@ impl Value {
     }
 }
 
-pub fn argmax(values: &Vec<Value>) -> usize {
+pub fn argmax(values: &[Value]) -> usize {
     // For now (while Value is scalar) - a separate function.
     // Even once Value contains vector - this is non-differentiable and the returned
     // Value objects do not have grad or backward_fn set
@@ -281,3 +286,177 @@ impl_binary_op!(self, rhs, Sub, sub, _sub, -, {
 });
 
 // TODO - also impl +=, -=, etc, unary ops
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::assert_close;
+    use anyhow::Result;
+    use paste::paste;
+    use tch::Tensor;
+
+    /// Test the use of an operator on a Value, from either side
+    macro_rules! test_op_data {
+        ($val1:expr, $val2:expr, $name:ident, $op:tt, $result:expr) => {
+            paste! {
+            #[test]
+                fn [<test_ $name _both>]() {
+                    assert_close!((Value::from($val1) $op Value::from($val2)).borrow().data, $result)
+                }
+            }
+
+            paste! {
+            #[test]
+                fn [<test_ $name _lhs>] () {
+                    let res = ($val1 $op Value::from($val2));
+                    let b = res.borrow();
+                    assert_close!(b.data, $result)
+                }
+            }
+
+            paste! {
+                #[test]
+                fn [<test_ $name _rhs>] () {
+                    assert_close!((Value::from($val1) $op $val2).borrow().data, $result)
+                }
+            }
+        };
+    }
+
+    test_op_data!(5.0, 6.0, add, +, 11.0);
+    test_op_data!(5.0, 6.0, sub, -, -1.0);
+    test_op_data!(5.0, 6.0, mul, *, 30.0);
+    test_op_data!(5.0, 6.0, div, /, 5./6.);
+
+    #[test]
+    fn check_torch_install() -> Result<()> {
+        let t = Tensor::from_slice(&[3, 1, 4, 1, 5]);
+        let t = t * 2;
+        assert_eq!(Vec::<i64>::try_from(t)?, vec![6, 2, 8, 2, 10]);
+        Ok(())
+    }
+
+    #[test]
+    fn compare_torch_1() {
+        let x = Value::from(-2.0);
+        let y = x.clone() * x.clone();
+        y.backward();
+        let (xmg, ymg) = (x.clone(), y);
+
+        let x = Tensor::from(-2.0).set_requires_grad(true);
+        let y = &x * &x;
+        y.backward();
+        let (xpt, ypt) = (&x, y);
+
+        //  forward pass went well
+        assert_eq!(ymg.data(), ypt.double_value(&[]));
+        // // backward pass went well
+        assert_eq!(xmg.grad().unwrap(), xpt.grad().double_value(&[]));
+    }
+
+    #[test]
+    fn compare_torch_2() {
+        let x = Value::from(-2.0);
+        let y = x.clone() + x.clone();
+        y.backward();
+        let (xmg, ymg) = (x.clone(), y);
+
+        let x = Tensor::from(-2.0).set_requires_grad(true);
+        let y = &x + &x;
+        y.backward();
+        let (xpt, ypt) = (&x, y);
+
+        //  forward pass went well
+        assert_eq!(ymg.data(), ypt.double_value(&[]));
+        // // backward pass went well
+        assert_eq!(xmg.grad().unwrap(), xpt.grad().double_value(&[]));
+    }
+
+    #[test]
+    fn compare_torch_many1() {
+        let x = Value::from(-4.0);
+        let z = 2 * &x + 2 + &x;
+        let q = &z.relu() + &z * &x;
+        let h = (&z * &z).relu();
+        let y = h + &q + &q * &x;
+        y.backward();
+        let (xmg, ymg) = (&x, y);
+
+        let x = Tensor::from(-4.0).set_requires_grad(true);
+        let z: Tensor = 2.0 * &x + 2.0 + &x;
+        let q = &z.relu() + &z * &x;
+        let h = (&z * &z).relu();
+        let y = h + &q + &q * &x;
+        y.backward();
+        let (xpt, ypt) = (&x, y);
+
+        //  forward pass went well
+
+        assert_eq!(ymg.data(), ypt.double_value(&[]));
+        // // backward pass went well
+        assert_eq!(xmg.grad().unwrap(), xpt.grad().double_value(&[]));
+    }
+
+    #[test]
+    fn compare_torch_many2() {
+        let a = Value::from(-4.0);
+        let b = Value::from(2.0);
+        let c = &a + &b;
+        let d = &a * &b + &b.pow(3.0);
+        let c = &c + &c + 1.0;
+        let c = &c + 1 + c + (-1 * &a);
+        let d = &d + &d * 2 + (&b + &a).relu();
+        let d = &d + 3 * &d + (&b - &a).relu();
+        let e = &c - &d;
+        let f = e.pow(2.0);
+        let g = &f / Value::from(2.0);
+        let g = &g + 10.0 / f.clone();
+        g.backward();
+        let (amg, bmg, gmg) = (a, b, g);
+
+        let a = Tensor::from(-4.0).set_requires_grad(true);
+        let b = Tensor::from(2.0).set_requires_grad(true);
+        let c = &a + &b;
+        let d = &a * &b + &b.pow(&Tensor::from(3.0));
+        let c = &c + &c + 1;
+        let c = &c + 1 + &c + (-&a);
+        let d = &d + &d * 2 + (&b + &a).relu();
+        let d = &d + 3 * &d + (&b - &a).relu();
+        let e: Tensor = &c - &d;
+        let f = e.pow(&Tensor::from(2.0));
+        let g = &f / &Tensor::from(2.0);
+        let g: Tensor = &g + &Tensor::from(10.0) / f;
+        g.backward();
+        let (apt, bpt, gpt) = (a, b, g);
+
+        // forward pass went well
+        assert_close!(gmg.data(), gpt.double_value(&[]));
+
+        // backward pass went well
+        // TODO - note that even strict equality is working, indicating probably op-for-op equivalence
+        // When we would be satisfied with merely achieving assert_close
+        assert_eq!(amg.grad().unwrap(), apt.grad().double_value(&[]));
+        assert_eq!(bmg.grad().unwrap(), bpt.grad().double_value(&[]));
+    }
+
+    #[test]
+    fn verify_hashset_behavior() {
+        use std::collections::HashSet;
+
+        let mut visited = HashSet::new();
+
+        let node = Value::from(5.0);
+        let mimic = Value::from(5.0);
+
+        visited.insert(&node);
+
+        assert!(visited.contains(&node));
+        // Demonstrate that we are not comparing by value
+        assert!(!visited.contains(&mimic));
+
+        // Demonstrate that we are comparing by reference (address)
+        let clone = node.clone();
+        assert!(node == clone);
+        assert!(visited.contains(&clone));
+    }
+}

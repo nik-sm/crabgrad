@@ -29,15 +29,7 @@ impl Optim for SGD {
     }
     fn step(&self) {
         for p in &self.parameters {
-            match p.backward_fn() {
-                Some(_) => {
-                    dbg!("before", &p);
-                    p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad");
-                    dbg!("after", &p);
-                    panic!("disco")
-                }
-                _ => p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad"),
-            }
+            p.borrow_mut().data = p.data() + self.lr * p.grad().expect("step without grad");
         }
     }
 }

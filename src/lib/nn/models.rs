@@ -17,12 +17,12 @@ pub trait Module {
 }
 
 pub trait Classifier: Module {
-    fn score(&self, data_labels: &[(Vec<Value>, i64)]) -> Result<f64> {
+    fn score(&self, data_labels: &[(Vec<Value>, usize)]) -> Result<f64> {
         let mut n_correct = 0usize;
         let mut n_total = 0usize;
 
-        for (data, label) in data_labels.into_iter() {
-            let logits = self.forward(&data)?;
+        for (data, label) in data_labels.iter() {
+            let logits = self.forward(data)?;
             let pred = argmax(&logits);
             n_total += 1;
             if pred == *label as usize {
