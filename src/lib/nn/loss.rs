@@ -1,26 +1,6 @@
 use crate::engine::{DiscreteLabel, Value};
 use core::f64;
 
-/*
-suppose x is a vector.
-
-softmax(x)_i = exp(x_i) / sum(exp(x))
-
-log_softmax(x)_i = log( exp(x_i) / sum(exp(x)) )
-    = x_i - log(sum(exp(x))
-    = x_i - log_sum_exp(x)
-
-
-cross_entropy(pred_probs, true_probs) = true_probs * log(pred_probs)
-
-logits = model(data)
-pred_probs = softmax(logits)
-log(pred_probs) = log(softmax(logits)) = log_softmax(logits)
-
-cross_entropy(pred_probs, true_probs) = true_probs * log_softmax(logits)
-
-*/
-
 pub fn cross_entropy_single(label: DiscreteLabel, logits: &[Value]) -> Value {
     let log_probs = log_softmax(logits);
     let msg = format!("label must be in range [0, {}]", logits.len());

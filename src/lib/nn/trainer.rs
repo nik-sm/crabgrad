@@ -11,17 +11,17 @@ use rand::seq::SliceRandom;
 
 pub struct Trainer<'a> {
     model: &'a dyn Classifier,
-    optim: &'a dyn Optim,
+    optim: &'a mut dyn Optim,
     epochs: usize,
     batch_size: usize,
 }
 impl<'a> Trainer<'a> {
-    pub fn new(model: &'a impl Classifier, epochs: usize, optim: &'a impl Optim, batch_size: usize) -> Self {
+    pub fn new(model: &'a impl Classifier, optim: &'a mut impl Optim, epochs: usize, batch_size: usize) -> Self {
         Trainer { model, epochs, optim, batch_size }
     }
 
     pub fn fit(
-        &self,
+        &mut self,
         train_data_labels: impl IntoIterator<Item = (Vec<FloatDataScalar>, DiscreteLabel)>,
         test_data_labels: Option<impl IntoIterator<Item = (Vec<FloatDataScalar>, DiscreteLabel)>>,
     ) -> Result<()> {
@@ -55,7 +55,7 @@ impl<'a> Trainer<'a> {
             for chunk in batches.into_iter() {
                 let mut loss = Value::from(0.0);
                 for (data, label) in chunk {
-                    let logits: Vec<Value> = self.model.forward(&data)?;
+                    let logits: Vec<Value> = self.model.forward(data)?;
                     loss = loss + cross_entropy_single(*label, &logits);
                 }
 

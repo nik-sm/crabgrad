@@ -26,7 +26,7 @@ pub trait Classifier: Module {
             let logits = self.forward(data)?;
             let pred = argmax(&logits);
             n_total += 1;
-            if pred == *label as usize {
+            if pred == *label {
                 n_correct += 1;
             }
         }

@@ -21,7 +21,8 @@ rand_distr = "0.5.1"
 
 [dev-dependencies]
 flamegraph = "0.6.8"
-tch = "0.20.0"
+tch = { version = "0.20.0", features = ["download-libtorch"] }
+
 
 [[bin]]
 name = "mlp"
