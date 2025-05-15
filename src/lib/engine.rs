@@ -176,10 +176,10 @@ impl Value {
             Some([orig]) => {
                 let our_grad = our_value_inner.grad.unwrap_or(0.0);
                 let mut orig = orig.borrow_mut();
-                orig.grad = Some(orig.grad.unwrap_or(0.0) + 1.0 / our_grad);
+                orig.grad = Some(orig.grad.unwrap_or(0.0) + 1.0 / orig.data * our_grad);
             }
             _ => {
-                unreachable!("binary op must have two ancestors")
+                unreachable!("log must have one ancestor")
             }
         };
         Value::new(data, Some(prev_nodes), Some(backward_fn))
@@ -214,7 +214,7 @@ impl Value {
                 first.grad = Some(first.grad.unwrap_or(0.0) + multiplier * our_grad);
             }
             _ => {
-                unreachable!("relu must have one ancestors")
+                unreachable!("relu must have one ancestor")
             }
         };
         Value::new(data, Some(prev_nodes), Some(backward_fn))
@@ -411,7 +411,8 @@ mod tests {
         let f = e.pow(2.0);
         let g = &f / Value::from(2.0);
         let g = &g + 10.0 / f.clone();
-        g.backward();
+        let h = g.log();
+        h.backward();
         let (amg, bmg, gmg) = (a, b, g);
 
         let a = Tensor::from(-4.0).set_requires_grad(true);
@@ -426,7 +427,8 @@ mod tests {
         let f = e.pow(&Tensor::from(2.0));
         let g = &f / &Tensor::from(2.0);
         let g: Tensor = &g + &Tensor::from(10.0) / f;
-        g.backward();
+        let h = g.log();
+        h.backward();
         let (apt, bpt, gpt) = (a, b, g);
 
         // forward pass went well

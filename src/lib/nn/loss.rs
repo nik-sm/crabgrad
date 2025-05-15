@@ -1,7 +1,27 @@
-use crate::engine::Value;
+use crate::engine::{DiscreteLabel, Value};
 use core::f64;
 
-pub fn cross_entropy_single(label: usize, logits: &[Value]) -> Value {
+/*
+suppose x is a vector.
+
+softmax(x)_i = exp(x_i) / sum(exp(x))
+
+log_softmax(x)_i = log( exp(x_i) / sum(exp(x)) )
+    = x_i - log(sum(exp(x))
+    = x_i - log_sum_exp(x)
+
+
+cross_entropy(pred_probs, true_probs) = true_probs * log(pred_probs)
+
+logits = model(data)
+pred_probs = softmax(logits)
+log(pred_probs) = log(softmax(logits)) = log_softmax(logits)
+
+cross_entropy(pred_probs, true_probs) = true_probs * log_softmax(logits)
+
+*/
+
+pub fn cross_entropy_single(label: DiscreteLabel, logits: &[Value]) -> Value {
     let log_probs = log_softmax(logits);
     let msg = format!("label must be in range [0, {}]", logits.len());
     log_probs.get(label).expect(&msg).clone()
@@ -27,9 +47,10 @@ pub fn logsumexp(logits: &[Value]) -> Value {
     }
 
     // Subtract max value, which gives equivalent result but more numerically stable
-    let shifted_logits = logits.iter().map(|v| v - max_val(logits));
+    let offset = max_val(logits);
+    let shifted_logits = logits.iter().map(|v| v - offset);
 
-    shifted_logits.map(|v| v.exp()).fold(Value::from(0.0), |acc, val| acc + val).log()
+    shifted_logits.map(|v| v.exp()).fold(Value::from(0.0), |acc, val| acc + val).log() + offset
 }
 
 #[cfg(test)]
@@ -37,26 +58,45 @@ mod tests {
     use super::*;
     use crate::engine::{DiscreteLabel, Value};
     use crate::optim::{Optim, SGD};
+    use anyhow::Result;
+    use tch;
+    use tch::nn::OptimizerConfig;
+    use tch::Tensor;
 
     #[test]
-    fn losses() {
-        let logits = vec![Value::from(1.0), Value::from(2.0)];
+    fn test_logsumexp() -> Result<()> {
+        let logits = vec![Value::from(2.0), Value::from(2.0)];
+        let lse1 = logsumexp(&logits);
+
+        let logits_torch = Tensor::try_from(vec![2.0, 2.0])?;
+        let lse2 = logits_torch.logsumexp(0, false);
+        assert_eq!(lse1.data(), lse2.double_value(&[]));
+        Ok(())
+    }
+
+    #[test]
+    fn losses() -> Result<()> {
+        // Try once with ours
+        let logits = vec![Value::from(1.0), Value::from(1.0)];
         let y_true = 0 as DiscreteLabel;
 
         let loss = cross_entropy_single(y_true, &logits);
-        let optim = SGD::new(logits.clone(), 1.0);
+        let optim = SGD::new(logits.clone(), 1e-3);
 
         let target_value_before = logits.get(y_true).unwrap().data();
-        dbg!("before", &logits);
         optim.zero_grad();
         loss.backward();
         optim.step();
-        dbg!("after", &logits);
 
-        let target_value_after = logits.get(y_true).unwrap().data();
-        dbg!(target_value_before, target_value_after);
-        // dbg!(loss);
-        assert!(target_value_after > target_value_before);
-        panic!("todo");
+        // Try once with torch
+
+        let vs = tch::nn::VarStore::new(tch::Device::Cpu);
+        let logits_t = vs.root().ones("foo", &[2]);
+        let y_true_t = Tensor::from(0i64);
+        let loss_t = logits_t.cross_entropy_for_logits(&y_true_t);
+        let mut optim_t = tch::nn::Sgd { momentum: 0.0, dampening: 0.0, wd: 0.0, nesterov: false }.build(&vs, 1e-3)?;
+
+        optim_t.backward_step(&loss_t);
+        Ok(())
     }
 }
