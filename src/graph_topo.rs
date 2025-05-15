@@ -10,38 +10,30 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::convert::From;
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
 use std::ptr;
 use std::rc::Rc;
 
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Clone, Debug)]
 pub struct Node(pub Rc<RefCell<NodeInner>>);
-
-impl Deref for Node {
-    type Target = Rc<RefCell<NodeInner>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 impl Hash for Node {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let ref_cell_addr = &***self;
-        ptr::hash(ref_cell_addr, state)
+        let addr = self.0.as_ptr();
+        ptr::hash(addr, state)
     }
 }
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        ptr::eq(self.0.as_ptr(), other.0.as_ptr())
+    }
+}
+impl Eq for Node {}
 
-#[derive(Eq)]
+#[derive(Debug)]
 pub struct NodeInner {
     pub label: String,
     pub backward_data: Option<usize>, // The data that gets filled during backward pass
     pub prev: Vec<Node>,
-}
-
-impl PartialEq for NodeInner {
-    fn eq(&self, other: &Self) -> bool {
-        self.label == other.label && self.backward_data == other.backward_data && self.prev == other.prev
-    }
 }
 
 impl<T> From<T> for NodeInner
@@ -62,20 +54,24 @@ where
     }
 }
 
-fn build_topo<'a>(node: &'a Node, visited: &mut HashSet<&'a Node>, topo_rev: &mut Vec<&'a Node>) {
-    if visited.insert(node) {
-        let prev = node.borrow().prev.clone();
+fn build_topo(node: &Node, visited: &mut HashSet<Node>, topo_rev: &mut Vec<Node>) {
+    if !visited.contains(node) {
+        visited.insert(node.clone());
+        let prev = &node.0.borrow().prev;
         for child in prev {
             build_topo(&child, visited, topo_rev)
         }
-        topo_rev.push(node);
+        topo_rev.push(node.clone());
     }
-    todo!()
 }
 
 impl Node {
-    fn link<T: Into<String>>(self, other: Node, label: T) -> Self {
-        Node(Rc::new(RefCell::new(NodeInner { label: label.into(), backward_data: None, prev: vec![self, other] })))
+    fn link<S: Into<String>>(self, other: &Node, label: S) -> Self {
+        Node(Rc::new(RefCell::new(NodeInner {
+            label: label.into(),
+            backward_data: None,
+            prev: vec![self, other.clone()],
+        })))
     }
 
     fn backward(self) {
@@ -86,22 +82,49 @@ impl Node {
 
         // let topo_strings = topo.iter().map(|node| node.0.borrow().label.clone()).collect();
 
-        self.borrow_mut().backward_data = Some(0);
+        self.0.borrow_mut().backward_data = Some(0);
+        dbg!("self {:?}", self);
         for (i, node) in topo_rev.iter().rev().enumerate() {
-            node.borrow_mut().backward_data = Some(i + 1)
+            node.0.borrow_mut().backward_data = Some(i + 1);
+            dbg!("node {i} {:?}", node);
         }
     }
 }
 
 fn main() {
     // First example - no cycles
-    let node1 = Node::from("dog");
-    let node2 = Node::from("cat");
+    let reused = Node::from("reused");
 
-    let node3 = node1.link(node2, "bear");
+    let node1 = Node::from("whoami");
+    let node2 = Node::from("grandparent 2");
 
-    let node4 = Node::from("pizza");
-    let node5 = node4.link(node3, "fry");
+    let node3 = node1.link(&node2, "grandparent 1");
+    let node4 = node3.link(&reused, "joining");
 
-    node5.backward();
+    let node5 = Node::from("parent 2");
+    let node6 = node5.link(&node4, "parent 1");
+
+    let node7 = node6.link(&reused, "root");
+
+    node7.backward();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn check_hashset_behavior() {
+        let foo = Node::from("foo");
+        let mut visited = HashSet::new();
+
+        assert!(!visited.contains(&foo));
+
+        visited.insert(&foo);
+        dbg!("after", &visited);
+
+        assert!(visited.contains(&foo));
+
+        let foo2 = Node::from("foo");
+        assert!(!visited.contains(&foo2));
+    }
 }

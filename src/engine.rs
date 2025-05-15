@@ -7,28 +7,33 @@ use std::rc::Rc;
 
 const PRECISION: usize = 3;
 
-type BackwardType2 = fn(Value, Value) -> Value;
-
 #[derive(Debug, Clone)]
 pub struct ValueInner {
     pub data: f64,
     pub grad: Option<f64>,
-    pub backward_fn: Option<BackwardType2>,
+    pub backward_fn: Option<fn() -> f64>,
     pub prev_nodes: Option<Vec<Value>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct Value(pub Rc<RefCell<ValueInner>>); // TODO - remove pub after testing
+#[derive(Debug)]
+pub struct Value(Rc<RefCell<ValueInner>>);
+
+impl Clone for Value {
+    /// To make it super clear that value.clone() only increments Rc
+    fn clone(&self) -> Self {
+        Value(Rc::clone(&self.0))
+    }
+}
 
 impl From<f64> for Value {
     fn from(data: f64) -> Self {
-        Self::new(data)
+        Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
 
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
-        ptr::eq(self, other)
+        ptr::eq(self.0.as_ptr(), other.0.as_ptr())
     }
 }
 
@@ -36,13 +41,18 @@ impl Eq for Value {}
 
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        (self as *const Self).hash(state);
+        ptr::hash(self.0.as_ptr(), state);
     }
 }
 
 impl ValueInner {
-    pub fn new(data: f64) -> Self {
-        return ValueInner { data, grad: None, backward_fn: None, prev_nodes: None };
+    pub fn new(data: f64, grad: Option<f64>, backward_fn: Option<fn() -> f64>, prev_nodes: Option<Vec<Value>>) -> Self {
+        ValueInner { data, grad, backward_fn, prev_nodes }
+    }
+}
+impl From<f64> for ValueInner {
+    fn from(data: f64) -> Self {
+        ValueInner { data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
@@ -53,9 +63,23 @@ impl Deref for Value {
     }
 }
 
+fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Value>) -> () {
+    // v is the child node and we have a link to our parent nodes
+    if !visited.contains(&node) {
+        // PartialEq and Hash both use address of ValueInner
+        visited.insert(node.clone());
+        if let Some(prev) = &node.borrow().prev_nodes {
+            for ancestor in prev {
+                build_topo(&ancestor, visited, topo_rev)
+            }
+        }
+        topo_rev.push(node.clone())
+    }
+}
+
 impl Value {
-    pub fn new(data: f64) -> Self {
-        Value(Rc::new(RefCell::new(ValueInner::new(data))))
+    pub fn new(data: f64, grad: Option<f64>, backward_fn: Option<fn() -> f64>, prev_nodes: Option<Vec<Value>>) -> Self {
+        Value(Rc::new(RefCell::new(ValueInner::new(data, grad, backward_fn, prev_nodes))))
     }
 
     pub fn data(&self) -> f64 {
@@ -70,60 +94,44 @@ impl Value {
         format!("data: {:.PRECISION$}\ngrad: {:.PRECISION$}", self.data(), grad)
     }
 
-    pub fn pow(&self, n: f64) -> Value {
-        Value::new(self.data().powf(n))
-        /*
+    // pub fn pow(&self, n: f64) -> Value {
+    //     Value::new(self.data().powf(n))
+    //     /*
 
-        def __pow__(self, other):
-            assert isinstance(other, (int, float)), "only supporting int/float powers for now"
-            out = Value(self.data**other, (self,), f'**{other}')
+    //     def __pow__(self, other):
+    //         assert isinstance(other, (int, float)), "only supporting int/float powers for now"
+    //         out = Value(self.data**other, (self,), f'**{other}')
 
-            def _backward():
-                self.grad += (other * self.data**(other-1)) * out.grad
-            out._backward = _backward
+    //         def _backward():
+    //             self.grad += (other * self.data**(other-1)) * out.grad
+    //         out._backward = _backward
 
-            return out
+    //         return out
 
-         */
-    }
+    //      */
+    // }
     pub fn backwards(&self) {
         // Topological order means for all directed edges  parent->child, parent appears first
         // To easily satisfy this property, we add each child, then add its parents, and reverse the whole list at the end
 
-        let mut visited = HashSet::<&Value>::new(); // For quick lookup
-        let mut topo = Vec::<&Value>::new(); // The actual topological order
+        let visited = &mut HashSet::new(); // For quick lookup
+        let topo_rev = &mut Vec::new(); // The actual topological order
 
         // // start the recursion
-        self.build_topo(&self, &mut visited, &mut topo);
+        build_topo(&self, visited, topo_rev);
 
         self.borrow_mut().grad = Some(1.0);
-        // for v in topo.iter().rev() {
-        //     todo!();
-        // }
-    }
-
-    fn build_topo<'a>(&'a self, node: &'a Value, visited: &mut HashSet<&'a Value>, topo: &mut Vec<&'a Value>) -> () {
-        // v is the child node and we have a link to our parent nodes
-        todo!();
-        if visited.insert(node) {
-            // Be sure our parent nodes are visited and added to the (reversed) topo
-            match &node.borrow().prev_nodes {
-                Some(prev_nodes) => prev_nodes.iter().for_each(|parent| self.build_topo(parent, visited, topo)),
+        for v in topo_rev.iter().rev() {
+            let mut v = v.borrow_mut();
+            match v.backward_fn {
                 None => {}
+                Some(f) => v.grad = Some(f()),
             }
-            // if let Some(prev) = &node.borrow().prev_nodes {
-            //     for child in prev.iter() {
-            //         self.build_topo(child, visited, topo);
-            //     }
-            // }
-
-            // Add us (the child) to the topo
-            topo.push(node);
         }
     }
 
     pub fn relu(&self) -> Value {
-        Value::new(if self.data() < 0.0 { 0.0 } else { self.data() })
+        Value::from(if self.data() < 0.0 { 0.0 } else { self.data() })
     }
 }
 
@@ -136,7 +144,7 @@ macro_rules! impl_binary_op {
         {
             type Output = Self;
             fn $method(self, rhs: T) -> Self {
-                Value::new(self.data() $operator rhs.into().data())
+                Value::from(self.data() $operator rhs.into().data())
             }
         }
 
@@ -144,7 +152,7 @@ macro_rules! impl_binary_op {
         impl $trait<Value> for f64 {
             type Output = Value;
             fn $method(self, rhs: Value) -> Value {
-                Value::new(self $operator rhs.data())
+                Value::from(self $operator rhs.data())
             }
         }
     )

@@ -38,19 +38,19 @@ mod tests {
     }
 
     /// Test the use of an operator on a Value, from either side
-    macro_rules! test_op {
+    macro_rules! test_op_data {
         ($val1:expr, $val2:expr, $name:ident, $op:tt, $result:expr) => {
             paste! {
             #[test]
                 fn [<test_ $name _both>]() {
-                    assert_close!((Value::new($val1) $op Value::new($val2)).borrow().data, $result)
+                    assert_close!((Value::from($val1) $op Value::from($val2)).borrow().data, $result)
                 }
             }
 
             paste! {
             #[test]
                 fn [<test_ $name _lhs>] () {
-                    let res = ($val1 $op Value::new($val2));
+                    let res = ($val1 $op Value::from($val2));
                     let b = res.borrow();
                     assert_close!(b.data, $result)
                 }
@@ -59,16 +59,16 @@ mod tests {
             paste! {
                 #[test]
                 fn [<test_ $name _rhs>] () {
-                    assert_close!((Value::new($val1) $op $val2).borrow().data, $result)
+                    assert_close!((Value::from($val1) $op $val2).borrow().data, $result)
                 }
             }
         };
     }
 
-    test_op!(5.0, 6.0, add, +, 11.0);
-    test_op!(5.0, 6.0, sub, -, -1.0);
-    test_op!(5.0, 6.0, mul, *, 30.0);
-    test_op!(5.0, 6.0, div, /, 5./6.);
+    test_op_data!(5.0, 6.0, add, +, 11.0);
+    test_op_data!(5.0, 6.0, sub, -, -1.0);
+    test_op_data!(5.0, 6.0, mul, *, 30.0);
+    test_op_data!(5.0, 6.0, div, /, 5./6.);
 
     // #[test]
     // fn test_mlp() {
@@ -81,53 +81,23 @@ mod tests {
     // }
 
     #[test]
-    fn verify_hashset_and_eq_behavior_for_rc() {
+    fn verify_hashset_behavior() {
         use std::collections::HashSet;
-        use std::rc::Rc;
-        let mut table = HashSet::new();
-        let item1 = Rc::new(Value::new(5.0));
-        let item1_clone = Rc::clone(&item1);
 
-        let item2 = Rc::new(Value::new(5.0));
-        table.insert(Rc::clone(&item1));
+        let mut visited = HashSet::new();
 
-        assert!(table.contains(&item1));
-        assert!(table.contains(&item1_clone));
+        let node = Value::from(5.0);
+        let mimic = Value::from(5.0);
 
-        assert!(!table.contains(&item2));
+        visited.insert(&node);
 
-        assert!(item1 == item1);
-        assert!(item1 == item1_clone);
-        assert!(item1 != item2);
-    }
+        assert!(visited.contains(&node));
+        // Demonstrate that we are not comparing by value
+        assert!(!visited.contains(&mimic));
 
-    #[test]
-    fn verify_clone_behavior() {
-        // Imagining that we create a node at one stage as an Rc<..>,
-        // then later need to mutate it during backward (changing its grad attribute)
-        use micrograd_rs::{Value, engine::ValueInner};
-        use std::cell::RefCell;
-        use std::collections::HashSet;
-        use std::rc::Rc;
-
-        // Create a graph with a cycle and see whether hashset with cloned items instead of refs is OK for detecting previosly visited nodes
-        let item1 = Value::new(1.23);
-        let item2 = Value(Rc::new(RefCell::new(ValueInner {
-            data: 7.89,
-            grad: None,
-            backward_fn: None,
-            prev_nodes: Some(vec![item1.clone()]),
-        })));
-
-        let mut visited = HashSet::<&Value>::new();
-        visited.insert(&item1);
-
-        assert!(visited.contains(&item1));
-        if let Some(prev) = &item2.borrow().prev_nodes {
-            dbg!("check prevs");
-            for child in prev {
-                assert!(visited.contains(&child));
-            }
-        }
+        // Demonstrate that we are comparing by reference (address)
+        let clone = node.clone();
+        assert!(node == clone);
+        assert!(visited.contains(&clone));
     }
 }

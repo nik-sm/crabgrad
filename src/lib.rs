@@ -19,9 +19,10 @@ mod tests {
 
     #[test]
     fn basic() {
-        let a = Value::new(2.0);
-        let b = Value::new(2.0);
+        let a = Value::from(2.0);
+        let b = Value::from(2.0);
 
         let c = a + b;
+        dbg!(&c);
     }
 }
