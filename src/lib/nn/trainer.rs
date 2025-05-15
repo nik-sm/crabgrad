@@ -1,4 +1,4 @@
-use crate::engine::Value;
+use crate::engine::{DiscreteLabel, FloatDataScalar, Value};
 use crate::nn::cross_entropy_single;
 use crate::nn::models::Classifier;
 use crate::optim::Optim;
@@ -22,11 +22,11 @@ impl<'a> Trainer<'a> {
 
     pub fn fit(
         &self,
-        train_data_labels: impl IntoIterator<Item = (Vec<f64>, usize)>,
-        test_data_labels: Option<impl IntoIterator<Item = (Vec<f64>, usize)>>,
+        train_data_labels: impl IntoIterator<Item = (Vec<FloatDataScalar>, DiscreteLabel)>,
+        test_data_labels: Option<impl IntoIterator<Item = (Vec<FloatDataScalar>, DiscreteLabel)>>,
     ) -> Result<()> {
         // Convert data and labels to Values as needed
-        fn to_values(raw: impl IntoIterator<Item = (Vec<f64>, usize)>) -> Vec<(Vec<Value>, usize)> {
+        fn to_values(raw: impl IntoIterator<Item = (Vec<FloatDataScalar>, DiscreteLabel)>) -> Vec<(Vec<Value>, usize)> {
             raw.into_iter().map(|(xs, y)| (xs.iter().map(Value::from).collect::<Vec<_>>(), y)).collect::<Vec<_>>()
         }
         let mut train_data_labels = to_values(train_data_labels);
@@ -55,18 +55,17 @@ impl<'a> Trainer<'a> {
             let bar = ProgressBar::new(batches_per_epoch.try_into()?);
             let batches = train_data_labels.iter().chunks(self.batch_size);
             for chunk in batches.into_iter() {
-                bar.inc(1);
-
-                self.optim.zero_grad();
-
                 let mut loss = Value::from(0.0);
                 for (data, label) in chunk {
                     let logits: Vec<Value> = self.model.forward(&data)?;
                     loss = loss + cross_entropy_single(*label, &logits);
                 }
-                loss.backward();
 
+                self.optim.zero_grad();
+                loss.backward();
                 self.optim.step();
+
+                bar.inc(1);
             }
 
             log::info!("Train acc: {}", self.model.score(&train_data_labels)?);

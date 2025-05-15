@@ -100,12 +100,13 @@ pub struct MLP {
 impl MLP {
     pub fn new(in_dim: usize, hidden_dims: Vec<usize>, out_dim: usize, bias: bool) -> Self {
         // API ensures at least one layer
+
+        // For all_dims.len() == n, always n-1 layers total
         let n = &hidden_dims.len() + 1;
         let all_dims = std::iter::once(in_dim).chain(hidden_dims).chain(std::iter::once(out_dim));
 
         let mut layers: Vec<Layer> = vec![];
 
-        // For all_dims.len() == n, always n-1 layers total
         for (idx, (d1, d2)) in all_dims.tuple_windows().enumerate() {
             let relu = idx < n;
             layers.push(Layer::new(d1, d2, bias, relu))
@@ -123,10 +124,65 @@ impl Module for MLP {
             next = layer.forward(prev)?;
             prev = &next;
         }
-        Ok(next.clone())
+        Ok(next)
     }
 
     fn parameters(&self) -> Vec<Value> {
         self.layers.iter().flat_map(|layer| layer.parameters()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Optim, optim::SGD};
+    use crate::{assert_close, assert_not_close};
+    use anyhow::Result;
+
+    #[test]
+    fn test_neuron() -> Result<()> {
+        // Check that a single layer will move as expected
+        // We multiply with a fixed vector, and keep re-normalizing the layer weights to a unit vector
+        // The neuron's weights should move towards being aligned
+        let n = Neuron::new(3, false, false);
+        let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
+
+        let optim = SGD::new(n.parameters(), 0.1);
+
+        let before = n.parameters();
+        assert_not_close!(before[0].data(), 1.0);
+        assert_not_close!(before[1].data(), 0.0);
+        assert_not_close!(before[2].data(), 0.0);
+
+        for _ in 0..1000 {
+            // Move param vector towards being a unit vector aligned with the data
+            let out = n.forward(&x)?.get(0).unwrap().to_owned();
+            let loss = 1 - out;
+
+            optim.zero_grad();
+            loss.backward();
+            optim.step();
+
+            // Normalize to unit length
+            let norm = n.parameters().iter().fold(0.0, |acc, val| acc + val.data().powf(2.0)).sqrt();
+            n.parameters().iter().for_each(|p| p.borrow_mut().data = p.data() / norm);
+        }
+
+        let after = n.parameters();
+        dbg!(&after);
+        assert_close!(after[0].data(), 1.0);
+        assert_close!(after[1].data(), 0.0);
+        assert_close!(after[2].data(), 0.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_layer() {
+        todo!()
+    }
+
+    #[test]
+    fn test_mlp() {
+        todo!()
     }
 }
