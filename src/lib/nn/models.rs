@@ -1,6 +1,7 @@
 use crate::{argmax, engine::Value};
 use anyhow::{Result, bail};
 use itertools::Itertools;
+use rand::SeedableRng;
 use rand_distr::{Distribution, Normal};
 
 pub trait Module {
@@ -43,14 +44,16 @@ pub struct Neuron {
 }
 impl Neuron {
     fn new(in_dim: usize, bias: bool, relu: bool) -> Self {
-        let mut rng = rand::rng();
-        let gaussian = Normal::new(0.0, 1.0).expect("create gaussian");
+        // Kaiming init: N(0, sqrt(2/num_inputs))
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+        let sigma = (2.0 / in_dim as f64).sqrt();
+        let gaussian = Normal::new(0.0, sigma).expect("create gaussian");
         let weights: Vec<Value> = gaussian.sample_iter(&mut rng).take(in_dim).map(Value::from).collect();
         let bias = if bias { Some(Value::from(gaussian.sample(&mut rng))) } else { None };
         Self { weights, bias, relu }
     }
 
-    fn normalize(&mut self) {
+    pub fn normalize(&mut self) {
         // TODO - this approach was extremely slow - why?
         // let norm = norm(&self.weights);
         // self.weights = self.weights.iter().map(|w| w / norm.clone()).collect();
@@ -94,7 +97,7 @@ impl Layer {
         Self { neurons: (0..out_dim).map(|_| Neuron::new(in_dim, bias, relu)).collect() }
     }
 
-    fn normalize(&mut self) {
+    pub fn normalize(&mut self) {
         for neuron in &mut self.neurons {
             neuron.normalize();
         }
@@ -133,7 +136,7 @@ impl MLP {
         Self { layers }
     }
 
-    fn normalize(&mut self) {
+    pub fn normalize(&mut self) {
         for layer in &mut self.layers {
             layer.normalize();
         }
@@ -142,13 +145,13 @@ impl MLP {
 
 impl Module for MLP {
     fn forward(&self, data: &[Value]) -> Result<Vec<Value>> {
-        let mut prev: &[Value] = data;
-        let mut next: Vec<Value> = vec![];
+        let mut features = data;
+        let mut out: Vec<Value> = vec![];
         for layer in &self.layers {
-            next = layer.forward(prev)?;
-            prev = &next;
+            out = layer.forward(features)?;
+            features = &out;
         }
-        Ok(next)
+        Ok(out)
     }
 
     fn parameters(&self) -> Vec<Value> {

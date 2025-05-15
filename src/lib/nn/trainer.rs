@@ -2,11 +2,11 @@ use crate::engine::{DiscreteLabel, FloatDataScalar, Value};
 use crate::nn::cross_entropy_single;
 use crate::nn::models::Classifier;
 use crate::optim::Optim;
-use crate::utils::try_init_logging;
+use crate::utils::init_logging;
 use anyhow::Result;
 use indicatif::ProgressBar;
 use itertools::Itertools;
-use rand::rng;
+use rand::SeedableRng;
 use rand::seq::SliceRandom;
 
 pub struct Trainer<'a> {
@@ -32,9 +32,7 @@ impl<'a> Trainer<'a> {
         let mut train_data_labels = to_values(train_data_labels);
         let test_data_labels = test_data_labels.map(to_values);
 
-        if let Err(e) = try_init_logging() {
-            eprintln!("Error while setting up logging: {e}")
-        }
+        init_logging();
 
         let div = train_data_labels.len() as f64 / self.batch_size as f64;
         let mut batches_per_epoch = div as usize;
@@ -48,7 +46,7 @@ impl<'a> Trainer<'a> {
             batches_per_epoch
         );
 
-        let mut rng = rng();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0);
         for e in 0..self.epochs {
             train_data_labels.shuffle(&mut rng);
             log::info!("{:-^20}", format!("Epoch {e}"));

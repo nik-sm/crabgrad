@@ -1,21 +1,26 @@
 use anyhow::Result;
+use log;
 use micrograd_rs::nn::{MLP, Module, Trainer};
 use micrograd_rs::optim::SGD;
-use micrograd_rs::utils::{make_binary_classification, train_test_split};
+use micrograd_rs::utils::{init_logging, make_binary_classification, train_test_split};
 
 fn main() -> Result<()> {
     let n_features = 64;
     let n_classes = 2;
+    let n_samples_each_class = 1000;
     let epochs = 10;
     let batch_size = 32;
 
-    let (data, labels) = make_binary_classification(1000, n_features);
+    let (data, labels) = make_binary_classification(n_samples_each_class, n_features);
 
+    init_logging();
     let (train_data_labels, test_data_labels) =
         train_test_split(data.into_iter().zip(labels).collect::<Vec<_>>(), 0.8, 0.2);
 
-    let model = MLP::new(n_features, vec![32, 16, 8], n_classes, true);
-    let optim = SGD::new(model.parameters(), 0.1);
+    // NOTE - performance for this toy problem is fragile and sensitive to hidden dims and weight init
+    let model = MLP::new(n_features, vec![], n_classes, true);
+    log::info!("Number parameters: {}", model.parameters().len());
+    let optim = SGD::new(model.parameters(), 1e-3);
     let trainer = Trainer::new(&model, epochs, &optim, batch_size);
     trainer.fit(train_data_labels, Some(test_data_labels))?;
 

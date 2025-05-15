@@ -16,7 +16,7 @@ indicatif = "0.17.11"
 itertools = "0.14.0"
 log = "0.4.27"
 paste = "1.0.15"
-rand = "0.9.1"
+rand = { version = "0.9.1", features = ["std_rng"] }
 rand_distr = "0.5.1"
 
 [dev-dependencies]

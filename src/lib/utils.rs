@@ -6,6 +6,7 @@ use env_logger::{Builder, Env};
 use itertools::Itertools;
 use log::Level;
 use rand;
+use rand::SeedableRng;
 use rand::seq::SliceRandom;
 use rand_distr::{Distribution, Normal};
 use std::io::Write;
@@ -23,7 +24,7 @@ pub fn get_workspace_dir() -> PathBuf {
     cargo_path.parent().unwrap().to_path_buf()
 }
 
-pub fn try_init_logging() -> Result<()> {
+fn try_init_logging() -> Result<()> {
     let env = Env::default().filter_or("RUST_LOG", "debug").write_style_or("LOG_STYLE", "always");
 
     Builder::from_env(env)
@@ -52,6 +53,12 @@ pub fn try_init_logging() -> Result<()> {
         })
         .try_init()?;
     Ok(())
+}
+
+pub fn init_logging() {
+    if let Err(e) = try_init_logging() {
+        eprintln!("Error while setting up logging: {e}")
+    }
 }
 
 pub fn is_close(a: f64, b: f64, rtol: f64, atol: f64) -> bool {
@@ -115,7 +122,7 @@ pub fn make_binary_classification(
     n_samples_each_class: usize,
     n_features: usize,
 ) -> (Vec<Vec<FloatDataScalar>>, Vec<DiscreteLabel>) {
-    let mut rng = rand::rng();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
     let mut data: Vec<Vec<FloatDataScalar>> = Vec::with_capacity(2 * n_samples_each_class * n_features);
     let mut labels: Vec<DiscreteLabel> = Vec::with_capacity(2 * n_samples_each_class);
 
@@ -156,7 +163,7 @@ pub fn train_test_split<X: Clone, Y: Clone>(
     train_frac: f64,
     test_frac: f64,
 ) -> (Dataset<X, Y>, Dataset<X, Y>) {
-    let mut rng = rand::rng();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
     let n_total = zipped_data_labels.len() as f64;
     let n_train = (train_frac / (train_frac + test_frac) * n_total) as usize;
 
