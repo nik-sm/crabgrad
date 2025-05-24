@@ -20,10 +20,12 @@ rand = { version = "0.9.1", features = ["std_rng"] }
 rand_distr = "0.5.1"
 
 [dev-dependencies]
+criterion = "0.6.0"
 flamegraph = "0.6.8"
 tch = { version = "0.20.0", features = ["download-libtorch"] }
 
 
-[[bin]]
-name = "mlp"
-path = "src/bin/mlp.rs"
+[[bench]]
+name = "benchmark"
+harness = false
+path = "benches/main.rs"

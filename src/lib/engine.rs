@@ -24,7 +24,7 @@ pub struct ValueInner {
 pub struct Value(Rc<RefCell<ValueInner>>);
 
 impl Clone for Value {
-    /// To make it super clear that value.clone() only increments Rc
+    /// To make it super clear that `value.clone()` only increments Rc
     fn clone(&self) -> Self {
         Value(Rc::clone(&self.0))
     }

@@ -62,7 +62,7 @@ mod tests {
         let y_true = 0 as DiscreteLabel;
 
         let loss = cross_entropy_single(y_true, &logits);
-        let optim = SGD::new(logits.clone(), 1e-3);
+        let mut optim = SGD::new(logits.clone(), 1e-3);
 
         optim.zero_grad();
         loss.backward();
@@ -95,7 +95,7 @@ mod tests {
         let loss_a = cross_entropy_single(y_true_a, &logits_a);
         let loss_b = cross_entropy_single(y_true_b, &logits_b);
 
-        let optim = SGD::new(logits_a.clone().into_iter().chain(logits_b.clone()).collect::<Vec<_>>(), 1e-3);
+        let mut optim = SGD::new(logits_a.clone().into_iter().chain(logits_b.clone()).collect::<Vec<_>>(), 1e-3);
         let loss = Value::from(0.0) + loss_a + loss_b;
 
         optim.zero_grad();

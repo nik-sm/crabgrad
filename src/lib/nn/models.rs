@@ -93,7 +93,7 @@ pub struct Layer {
     neurons: Vec<Neuron>,
 }
 impl Layer {
-    fn new(in_dim: usize, out_dim: usize, bias: bool, relu: bool) -> Self {
+    pub fn new(in_dim: usize, out_dim: usize, bias: bool, relu: bool) -> Self {
         Self { neurons: (0..out_dim).map(|_| Neuron::new(in_dim, bias, relu)).collect() }
     }
 
@@ -213,7 +213,7 @@ mod tests {
 
         let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
 
-        let optim = SGD::new(n.parameters(), 0.1);
+        let mut optim = SGD::new(n.parameters(), 0.1);
 
         let before = n.parameters();
         assert_not_close!(before[0].data(), 1.0);
@@ -252,7 +252,7 @@ mod tests {
 
         let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
 
-        let optim = SGD::new(layer.parameters(), 0.1);
+        let mut optim = SGD::new(layer.parameters(), 0.1);
 
         let neuron_0 = &layer.neurons[0];
         assert_not_close!(neuron_0.parameters()[0].data(), 1.0);
