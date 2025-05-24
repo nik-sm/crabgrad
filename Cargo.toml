@@ -3,6 +3,11 @@ name = "micrograd-rs"
 version = "0.1.0"
 edition = "2024"
 resolver = "3"
+description = "A simple and non-optimized backward-mode automatic differentiation library, heavily inspired by https://github.com/karpathy/micrograd/"
+repository = "https://github.com/nik-sm/micrograd-rs"
+keywords = ["automatic differentiation", "autograd", "backward mode", "neural networks"]
+categories = ["science", "mathematics"]
+license-file = "LICENSE"
 
 [lib]
 path="src/lib/lib.rs"
@@ -23,6 +28,13 @@ rand_distr = "0.5.1"
 criterion = "0.6.0"
 flamegraph = "0.6.8"
 tch = { version = "0.20.0", features = ["download-libtorch"] }
+
+[lints.clippy]
+all = "warn"
+# pedantic = "warn"
+# nursery = "warn"
+cargo = "warn"
+# restriction = "warn"
 
 
 [[bench]]
