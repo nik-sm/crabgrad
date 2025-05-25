@@ -26,7 +26,7 @@ pub struct Value(Rc<RefCell<ValueInner>>);
 impl Clone for Value {
     /// To make it super clear that `value.clone()` only increments Rc
     fn clone(&self) -> Self {
-        Value(Rc::clone(&self.0))
+        Self(Rc::clone(&self.0))
     }
 }
 
@@ -68,30 +68,30 @@ impl Hash for Value {
 }
 
 impl ValueInner {
-    pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
-        ValueInner { data, grad: None, prev_nodes, backward_fn }
+    pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&Self)>) -> Self {
+        Self { data, grad: None, prev_nodes, backward_fn }
     }
 }
 
 impl From<FloatDataScalar> for ValueInner {
     fn from(data: FloatDataScalar) -> Self {
-        ValueInner { data, grad: None, backward_fn: None, prev_nodes: None }
+        Self { data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 impl From<&FloatDataScalar> for ValueInner {
     fn from(data: &FloatDataScalar) -> Self {
-        ValueInner { data: *data, grad: None, backward_fn: None, prev_nodes: None }
+        Self { data: *data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
 impl From<IntDataScalar> for ValueInner {
     fn from(data: IntDataScalar) -> Self {
-        ValueInner { data: data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
+        Self { data: data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 impl From<&IntDataScalar> for ValueInner {
     fn from(data: &IntDataScalar) -> Self {
-        ValueInner { data: *data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
+        Self { data: *data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
@@ -117,8 +117,8 @@ fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Val
 }
 
 impl Value {
-    pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
-        Value(Rc::new(RefCell::new(ValueInner::new(data, prev_nodes, backward_fn))))
+    pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Self>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
+        Self(Rc::new(RefCell::new(ValueInner::new(data, prev_nodes, backward_fn))))
     }
 
     pub fn data(&self) -> FloatDataScalar {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use criterion::{Criterion, criterion_group, criterion_main};
 use micrograd_rs::engine::{Value, sum};
-use micrograd_rs::nn::{Layer, Module};
+use micrograd_rs::nn::{MLP, Module};
 use micrograd_rs::optim::{Optim, SGD};
 
 fn ops_in_loop(n: usize) {
@@ -11,18 +11,14 @@ fn ops_in_loop(n: usize) {
     }
 }
 
-fn layer_sgd(n: usize) -> Result<()> {
+fn mlp_sgd(n: usize) -> Result<()> {
     {
-        // Check that each neuron in a single layer will move as expected
-        // Same strategy as used for single neuron case
-        let mut layer = Layer::new(3, 2, false, false);
-        layer.normalize();
-
-        let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
-        let mut optim = SGD::new(layer.parameters(), 0.1);
+        let mut model = MLP::new(10, &[10], 2, true);
+        let data: Vec<Value> = (0..10).map(|_| Value::from(12.345)).collect();
+        let mut optim = SGD::new(model.parameters(), 0.1);
 
         for _ in 0..n {
-            let out = layer.forward(&x)?;
+            let out = model.forward(&data)?;
             let loss = 1 - sum(&out);
 
             optim.zero_grad();
@@ -30,7 +26,7 @@ fn layer_sgd(n: usize) -> Result<()> {
             optim.step();
 
             // Normalize to unit length
-            layer.normalize();
+            model.normalize();
         }
     }
     Ok(())
@@ -40,7 +36,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("basic-benchmarks");
     group.sample_size(100);
     group.bench_function("ops 10_000", |b| b.iter(|| ops_in_loop(10_000)));
-    group.bench_function("layer_sgd 10_000", |b| b.iter(|| layer_sgd(10_000)));
+    group.bench_function("mlp_sgd 10_000", |b| b.iter(|| mlp_sgd(10_000)));
 }
 
 criterion_group!(benches, criterion_benchmark);

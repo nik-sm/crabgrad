@@ -18,7 +18,7 @@ fn main() -> Result<()> {
         train_test_split(data.into_iter().zip(labels).collect::<Vec<_>>(), 0.8, 0.2);
 
     // NOTE - performance for this toy problem is fragile and sensitive to hidden dims and weight init
-    let model = MLP::new(n_features, vec![32], n_classes, true);
+    let model = MLP::new(n_features, &[32], n_classes, true);
     log::info!("Number parameters: {}", model.parameters().len());
     // let optim = SGD::new(model.parameters(), 1e-3);
     let mut optim = AdamW::new(model.parameters(), 1e-2, 0.9, 0.999, 1e-8, 0.0);

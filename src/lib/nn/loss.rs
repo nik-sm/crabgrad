@@ -74,15 +74,15 @@ mod tests {
                 logits.into_iter().map(|v| v.exp()).fold(Value::from(0.0), |acc, val| acc + val).log();
             logits.iter().map(|l| l - naive_log_sum_exp.clone()).collect()
         }
-        let log_probs_naive_ok = naive_log_softmax(&vec![Value::from(1.0), Value::from(2.0)]);
+        let log_probs_naive_ok = naive_log_softmax(&[Value::from(1.0), Value::from(2.0)]);
         assert_vec_close!(log_probs, log_probs_naive_ok);
 
         // ...but fails for large logits due to overflow...
-        let log_probs_naive_big = naive_log_softmax(&vec![Value::from(1.0 + 10_000.0), Value::from(2.0 + 10_000.0)]);
+        let log_probs_naive_big = naive_log_softmax(&[Value::from(1.0 + 10_000.0), Value::from(2.0 + 10_000.0)]);
         assert_vec_not_close!(log_probs, log_probs_naive_big);
 
         // ... and for very small logits due to underflow...
-        let log_probs_naive_small = naive_log_softmax(&vec![Value::from(1.0 - 10_000.0), Value::from(2.0 - 10_000.0)]);
+        let log_probs_naive_small = naive_log_softmax(&[Value::from(1.0 - 10_000.0), Value::from(2.0 - 10_000.0)]);
         assert_vec_not_close!(log_probs, log_probs_naive_small);
     }
 

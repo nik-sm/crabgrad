@@ -119,12 +119,12 @@ pub struct MLP {
     layers: Vec<Layer>,
 }
 impl MLP {
-    pub fn new(in_dim: usize, hidden_dims: Vec<usize>, out_dim: usize, bias: bool) -> Self {
+    pub fn new(in_dim: usize, hidden_dims: &[usize], out_dim: usize, bias: bool) -> Self {
         // API ensures at least one layer
 
         // For all_dims.len() == n, always n-1 layers total
         let n = &hidden_dims.len() + 1;
-        let all_dims = std::iter::once(in_dim).chain(hidden_dims).chain(std::iter::once(out_dim));
+        let all_dims = std::iter::once(in_dim).chain(hidden_dims.to_owned()).chain(std::iter::once(out_dim));
 
         let mut layers: Vec<Layer> = vec![];
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_mlp_normalize() {
-        let mut mlp = MLP::new(3, vec![3, 2], 2, false);
+        let mut mlp = MLP::new(3, &[3, 2], 2, false);
         for layer in &mlp.layers {
             for n in &layer.neurons {
                 assert_not_close!(norm(&n.weights).data(), 1.0);
