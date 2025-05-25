@@ -298,8 +298,16 @@ pub fn pow<T: Clone + Into<Value>>(values: &[Value], exponent: T) -> Vec<Value> 
     values.iter().map(|value| value.pow(exponent.clone().into())).collect()
 }
 
+pub fn exp(values: &[Value]) -> Vec<Value> {
+    values.iter().map(|value| value.exp()).collect()
+}
+
 pub fn norm(values: &[Value]) -> Value {
     sum(&pow(values, 2)).pow(0.5)
+}
+
+pub fn to_vec(values: &[Value]) -> Vec<FloatDataScalar> {
+    values.iter().map(|v| v.data()).collect()
 }
 
 // TODO - also impl +=, -=, etc, unary ops
@@ -495,6 +503,19 @@ mod tests {
     fn test_pow() {
         let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
         assert_vec_close!(pow(&values, 2.0), vec![Value::from(4.0), Value::from(9.0), Value::from(1.0)])
+    }
+
+    #[test]
+    fn test_exp() {
+        let values = vec![Value::from(0.5f64.ln()), Value::from(0.5f64.ln())];
+        assert_vec_close!(exp(&values), vec![Value::from(0.5), Value::from(0.5)]);
+    }
+
+    #[test]
+    fn test_to_vec() {
+        let values = vec![Value::from(1.0), Value::from(2.0)];
+        assert_eq!(to_vec(&values), vec![1.0, 2.0]);
+        dbg!(values);
     }
 
     #[test]

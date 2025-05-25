@@ -118,6 +118,18 @@ macro_rules! assert_vec_close {
     };
 }
 
+// TODO - this scoping is not setup properly. Users who want `assert_vec_not_close!(...)` must also import `assert_not_close!(...)` even though
+// they don't directly use it, which is confusing
+#[macro_export]
+macro_rules! assert_vec_not_close {
+    ($left:expr, $right:expr) => {
+        $left.iter().zip($right).for_each(|(l, r)| assert_not_close!(l.data(), r.data()))
+    };
+    ($left:expr, $right:expr, $rtol:expr, $atol:expr) => {
+        $left.iter().zip($right).for_each(|(l, r)| assert_not_close!(l.data(), r.data(), $rtol, $atol))
+    };
+}
+
 pub fn make_binary_classification(
     n_samples_each_class: usize,
     n_features: usize,

@@ -1,28 +1,18 @@
-# TODO
+A simple and non-optimized backward-mode automatic differentiation library, heavily inspired by https://github.com/karpathy/micrograd/.
 
-Next steps:
-- Engineering and ergonomics:
-    - Be sure all ops can be used on literals of `i64` or `f64`, and add tests
-    - Deduplicate
-
-- More ops:
-    - Implement: +=, -=, *=, /=, unary negation
-
-- Try on toy dataset (MNIST, etc)
-
-# Setup
-
-To compare against torch, there are unit tests that use [tch-rs](https://github.com/LaurentMazare/tch-rs) and scripts that use [pytorch](https://github.com/pytorch/pytorch).
+To check for correctness against torch, there are unit tests that use [tch-rs](https://github.com/LaurentMazare/tch-rs) and scripts that use [pytorch](https://github.com/pytorch/pytorch).
 
 # Usage
 
-```shell
-cargo clean
-cargo check
-cargo test
-cargo clippy
+Typical cargo commands are used to lint, check, compile, and run examples:
 
-cargo run mlp  # Example end-to-end library usage
+```shell
+cargo check  # static checks
+cargo test  # run tests
+cargo clippy  # lints
+cargo bench  # run benchmarks before & after changes
+
+cargo run --example mlp  # Example end-to-end library usage
 cargo flamegraph --root --bin mlp   # View output SVG in firefox
 ```
 
@@ -43,6 +33,18 @@ source venv/bin/activate
 pip install -r pytorch-examples/requirements.txt
 ```
 
+Run scripts:
+```shell
+python pytorch-examples/mlp.py
+cargo run --example mlp
+
+python pytorch-examples/losses.py
+cargo run --example losses
+
+python pytorch-examples/unit-vector.py
+cargo run --example unit-vector
+```
+
 ## Comparison against tch
 
 `tch` requires libtorch.
@@ -61,3 +63,11 @@ cargo clean
 cargo test
 ```
 
+# TODO
+
+- Engineering and ergonomics:
+    - Be sure all ops can be used on literals of `i64` or `f64`, and add tests
+    - Deduplicate
+    - More convenience ops: +=, -=, *=, /=, unary negation
+
+- Add MNIST example

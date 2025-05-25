@@ -38,9 +38,9 @@ impl Classifier for MLP {}
 
 #[derive(Debug)]
 pub struct Neuron {
-    weights: Vec<Value>,
-    bias: Option<Value>,
-    relu: bool,
+    pub weights: Vec<Value>,
+    pub bias: Option<Value>,
+    pub relu: bool,
 }
 impl Neuron {
     fn new(in_dim: usize, bias: bool, relu: bool) -> Self {
@@ -90,7 +90,7 @@ impl Module for Neuron {
 
 #[derive(Debug)]
 pub struct Layer {
-    neurons: Vec<Neuron>,
+    pub neurons: Vec<Neuron>,
 }
 impl Layer {
     pub fn new(in_dim: usize, out_dim: usize, bias: bool, relu: bool) -> Self {
