@@ -8,7 +8,7 @@ fn main() -> Result<()> {
     let n_features = 64;
     let n_classes = 2;
     let n_samples_each_class = 1000;
-    let epochs = 1;
+    let epochs = 10;
     let batch_size = 32;
 
     let (data, labels) = make_binary_classification(n_samples_each_class, n_features);

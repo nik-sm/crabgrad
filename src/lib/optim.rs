@@ -23,11 +23,13 @@ impl SGD {
 }
 
 impl Optim for SGD {
+    #[inline]
     fn zero_grad(&self) {
         for p in &self.parameters {
             p.zero_grad();
         }
     }
+    #[inline]
     fn step(&mut self) {
         for p in &self.parameters {
             p.borrow_mut().data = self.lr.mul_add(-p.grad().expect("step without grad"), p.data());
@@ -66,12 +68,14 @@ impl AdamW {
 }
 
 impl Optim for AdamW {
+    #[inline]
     fn zero_grad(&self) {
         for p in &self.parameters {
             p.zero_grad();
         }
     }
 
+    #[inline]
     fn step(&mut self) {
         self.time_step += 1;
         for (idx, p) in self.parameters.iter().enumerate() {

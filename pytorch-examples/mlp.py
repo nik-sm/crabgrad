@@ -60,7 +60,7 @@ def main():
     n_features = 64
     n_classes = 2
     n_samples_each_class = 1000
-    epochs = 1
+    epochs = 10
     batch_size = 32
 
     data, labels = make_binary_classification(

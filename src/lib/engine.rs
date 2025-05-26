@@ -116,6 +116,7 @@ impl Deref for Value {
 }
 
 // TODO - convert from recursion to iteration
+#[allow(clippy::mutable_key_type)]
 fn build_topo_recursive(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Value>) {
     // v is the child node and we have a link to our parent nodes
     if !visited.contains(node) {
@@ -130,35 +131,36 @@ fn build_topo_recursive(node: &Value, visited: &mut HashSet<Value>, topo_rev: &m
     }
 }
 
-fn build_topo_iterative(root_node: Value) -> Vec<Value> {
-    enum State {
-        Unripe, // Visit this node's ancestors first
-        Ripe,   // Node's ancestors were completed. Now it is ready
-    }
+// // NOTE - iterative was much slower in a simple benchmark
+// fn build_topo_iterative(root_node: Value) -> Vec<Value> {
+//     enum State {
+//         Unripe, // Visit this node's ancestors first
+//         Ripe,   // Node's ancestors were completed. Now it is ready
+//     }
 
-    let mut visited = HashSet::new();
-    let mut topo_rev = Vec::new(); // The actual topological order
-    let mut stack = vec![(root_node, State::Unripe)];
-    while let Some((node, state)) = stack.pop() {
-        match state {
-            State::Unripe => {
-                stack.push((node.clone(), State::Ripe));
-                if let Some(prev) = node.borrow().prev_nodes.clone() {
-                    for ancestor in prev {
-                        stack.push((ancestor.clone(), State::Unripe));
-                    }
-                }
-            }
-            State::Ripe => {
-                if !visited.contains(&node) {
-                    visited.insert(node.clone());
-                    topo_rev.push(node);
-                }
-            }
-        }
-    }
-    topo_rev
-}
+//     let mut visited = HashSet::new();
+//     let mut topo_rev = Vec::new(); // The actual topological order
+//     let mut stack = vec![(root_node, State::Unripe)];
+//     while let Some((node, state)) = stack.pop() {
+//         match state {
+//             State::Unripe => {
+//                 stack.push((node.clone(), State::Ripe));
+//                 if let Some(prev) = node.borrow().prev_nodes.clone() {
+//                     for ancestor in prev {
+//                         stack.push((ancestor.clone(), State::Unripe));
+//                     }
+//                 }
+//             }
+//             State::Ripe => {
+//                 if !visited.contains(&node) {
+//                     visited.insert(node.clone());
+//                     topo_rev.push(node);
+//                 }
+//             }
+//         }
+//     }
+//     topo_rev
+// }
 
 impl Value {
     #[must_use]
@@ -239,13 +241,15 @@ impl Value {
         Self::new(data, Some(prev_nodes), Some(backward_fn))
     }
 
-    pub fn backward_recursive(&self) {
+    // Recursive way
+    pub fn backward(&self) {
         // Topological order means for all directed edges  parent->child, parent appears first
         // To easily satisfy this property, we add each child, then add its parents, and reverse the whole list at the end
 
+        #[allow(clippy::mutable_key_type)]
         let mut visited = HashSet::new(); // For quick lookup
+        #[allow(clippy::mutable_key_type)]
         let mut topo_rev = Vec::new(); // The actual topological order
-        // start the recursion
         build_topo_recursive(self, &mut visited, &mut topo_rev);
 
         self.borrow_mut().grad = Some(1.0);
@@ -256,16 +260,17 @@ impl Value {
         }
     }
 
-    pub fn backward(&self) {
-        let topo = build_topo_iterative(self.clone());
+    // // Iterative way
+    // pub fn backward(&self) {
+    //     let topo = build_topo_iterative(self.clone());
 
-        self.borrow_mut().grad = Some(1.0);
-        for v in topo.iter().rev() {
-            if let Some(backprop) = &v.borrow().backward_fn {
-                backprop(&v.borrow());
-            }
-        }
-    }
+    //     self.borrow_mut().grad = Some(1.0);
+    //     for v in topo.iter().rev() {
+    //         if let Some(backprop) = &v.borrow().backward_fn {
+    //             backprop(&v.borrow());
+    //         }
+    //     }
+    // }
 
     #[must_use]
     pub fn relu(&self) -> Self {
