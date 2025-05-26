@@ -310,7 +310,7 @@ pub fn prod(values: &[Value]) -> Value {
 }
 
 #[must_use]
-pub fn pow<T: Clone + Into<Value>>(values: &[Value], exponent: T) -> Vec<Value> {
+pub fn pow<T: Clone + Into<Value>>(values: &[Value], exponent: &T) -> Vec<Value> {
     values.iter().map(|value| value.pow(exponent.clone().into())).collect()
 }
 
@@ -321,7 +321,7 @@ pub fn exp(values: &[Value]) -> Vec<Value> {
 
 #[must_use]
 pub fn norm(values: &[Value]) -> Value {
-    sum(&pow(values, 2)).pow(0.5)
+    sum(&pow(values, &2)).pow(0.5)
 }
 
 #[must_use]
@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn test_pow() {
         let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
-        assert_vec_close!(pow(&values, 2.0), vec![Value::from(4.0), Value::from(9.0), Value::from(1.0)]);
+        assert_vec_close!(pow(&values, &2.0), vec![Value::from(4.0), Value::from(9.0), Value::from(1.0)]);
     }
 
     #[test]

@@ -66,11 +66,8 @@ pub fn init_logging() {
 pub fn is_close(a: f64, b: f64, rtol: f64, atol: f64) -> bool {
     let close = (a - b).abs() < rtol.mul_add(b.abs(), atol);
     let finite = a.is_finite() && b.is_finite();
-    let perfect_equal = a == b;
-    let mut result = close && finite || perfect_equal;
-    // If both are NaN, consider them equal
-    result |= a.is_nan() & b.is_nan();
-    result
+    let perfect_equal = (a.is_nan() && b.is_nan()) || a == b;
+    perfect_equal || (close && finite)
 }
 
 pub const DEFAULT_RTOL: f64 = 1e-5;
@@ -144,7 +141,7 @@ pub fn make_binary_classification(
     // NOTE - simple approach; spherical gaussians aligned on the diagonal line y = x1 + x2 + x3 + ...
 
     // class 0
-    let normal = Normal::new(0.0, 1.0).unwrap();
+    let normal = Normal::new(0.0, 1.0).expect("create distribution");
 
     data.extend(
         normal
@@ -157,7 +154,7 @@ pub fn make_binary_classification(
     labels.extend(vec![0; n_samples_each_class]);
 
     // class 1
-    let normal = Normal::new(2.0, 1.0).unwrap();
+    let normal = Normal::new(2.0, 1.0).expect("create distribution");
     data.extend(
         normal
             .sample_iter(&mut rng)
@@ -172,6 +169,9 @@ pub fn make_binary_classification(
 }
 
 #[must_use]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_precision_loss)]
 pub fn train_test_split<X: Clone, Y: Clone>(
     mut zipped_data_labels: Dataset<X, Y>,
     train_frac: f64,
@@ -179,7 +179,9 @@ pub fn train_test_split<X: Clone, Y: Clone>(
 ) -> (Dataset<X, Y>, Dataset<X, Y>) {
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
     let n_total = zipped_data_labels.len() as f64;
-    let n_train = (train_frac / (train_frac + test_frac) * n_total) as usize;
+    // let train_frac = train_frac.clamp(0.0, 1.0);
+    // let test_frac = test_frac.clamp(0.0, 1.0);
+    let n_train = ((train_frac / (train_frac + test_frac)).clamp(0.0, 1.0) * n_total) as usize;
 
     zipped_data_labels.shuffle(&mut rng);
     let (train_part, test_part) = zipped_data_labels.split_at(n_train);

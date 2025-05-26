@@ -31,10 +31,8 @@ tch = { version = "0.20.0", features = ["download-libtorch"] }
 
 [lints.clippy]
 all = "warn"
-pedantic = "warn"
-nursery = "warn"
 cargo = "warn"
-perf = "warn"
+correctness = "deny"
 
 
 [[bench]]
