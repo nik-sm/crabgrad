@@ -12,6 +12,7 @@ use rand_distr::{Distribution, Normal};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+#[must_use]
 pub fn get_workspace_dir() -> PathBuf {
     let output = std::process::Command::new(env!("CARGO"))
         .arg("locate-project")
@@ -38,8 +39,8 @@ fn try_init_logging() -> Result<()> {
                 Level::Error => (240, 80, 120),
             };
             // A bit wasteful, but looks nice: string interpolate, then add brackets, then pad, then colorize
-            let level_str = format!("[{}]", level);
-            let level_final = format!("{L:<7}", L = level_str).truecolor(level_color.0, level_color.1, level_color.2);
+            let level_str = format!("[{level}]");
+            let level_final = format!("{level_str:<7}").truecolor(level_color.0, level_color.1, level_color.2);
 
             let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string().truecolor(120, 120, 120);
             // let target = record.target().to_string().truecolor(147, 182, 182);
@@ -57,12 +58,13 @@ fn try_init_logging() -> Result<()> {
 
 pub fn init_logging() {
     if let Err(e) = try_init_logging() {
-        eprintln!("Error while setting up logging: {e}")
+        eprintln!("Error while setting up logging: {e}");
     }
 }
 
+#[must_use]
 pub fn is_close(a: f64, b: f64, rtol: f64, atol: f64) -> bool {
-    let close = (a - b).abs() < (atol + rtol * b.abs());
+    let close = (a - b).abs() < rtol.mul_add(b.abs(), atol);
     let finite = a.is_finite() && b.is_finite();
     let perfect_equal = a == b;
     let mut result = close && finite || perfect_equal;
@@ -130,6 +132,7 @@ macro_rules! assert_vec_not_close {
     };
 }
 
+#[must_use]
 pub fn make_binary_classification(
     n_samples_each_class: usize,
     n_features: usize,
@@ -149,8 +152,7 @@ pub fn make_binary_classification(
             .take(n_samples_each_class * n_features)
             .chunks(n_features)
             .into_iter()
-            .map(|chunk| chunk.collect())
-            .collect::<Vec<Vec<_>>>(),
+            .map(std::iter::Iterator::collect),
     );
     labels.extend(vec![0; n_samples_each_class]);
 
@@ -162,14 +164,14 @@ pub fn make_binary_classification(
             .take(n_samples_each_class * n_features)
             .chunks(n_features)
             .into_iter()
-            .map(|chunk| chunk.collect())
-            .collect::<Vec<Vec<_>>>(),
+            .map(std::iter::Iterator::collect),
     );
     labels.extend(vec![1; n_samples_each_class]);
 
     (data, labels)
 }
 
+#[must_use]
 pub fn train_test_split<X: Clone, Y: Clone>(
     mut zipped_data_labels: Dataset<X, Y>,
     train_frac: f64,
@@ -191,7 +193,7 @@ mod tests {
     #[test]
     fn test_get_workspace_dir() {
         let workspace_dir = get_workspace_dir();
-        println!("workspace_dir: {:?}", workspace_dir);
+        println!("workspace_dir: {workspace_dir:?}");
     }
 
     #[test]

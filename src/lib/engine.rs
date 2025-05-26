@@ -68,6 +68,7 @@ impl Hash for Value {
 }
 
 impl ValueInner {
+    #[must_use]
     pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Value>>, backward_fn: Option<fn(&Self)>) -> Self {
         Self { data, grad: None, prev_nodes, backward_fn }
     }
@@ -109,39 +110,43 @@ fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Val
         visited.insert(node.clone());
         if let Some(prev) = &node.borrow().prev_nodes {
             for ancestor in prev {
-                build_topo(ancestor, visited, topo_rev)
+                build_topo(ancestor, visited, topo_rev);
             }
         }
-        topo_rev.push(node.clone())
+        topo_rev.push(node.clone());
     }
 }
 
 impl Value {
+    #[must_use]
     pub fn new(data: FloatDataScalar, prev_nodes: Option<Vec<Self>>, backward_fn: Option<fn(&ValueInner)>) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::new(data, prev_nodes, backward_fn))))
     }
 
+    #[must_use]
     pub fn data(&self) -> FloatDataScalar {
         self.borrow().data
     }
 
+    #[must_use]
     pub fn grad(&self) -> Option<FloatDataScalar> {
         self.borrow().grad
     }
 
+    #[must_use]
     pub fn backward_fn(&self) -> Option<fn(&ValueInner)> {
         self.borrow().backward_fn
     }
 
     pub fn zero_grad(&self) {
-        self.borrow_mut().grad = None
+        self.borrow_mut().grad = None;
     }
 
-    pub fn pow<T: Into<Value>>(&self, exponent: T) -> Value {
+    pub fn pow<T: Into<Self>>(&self, exponent: T) -> Self {
         let exponent = exponent.into();
 
         let data = self.data().powf(exponent.data());
-        let prev_nodes = vec![self.clone(), exponent.clone()];
+        let prev_nodes = vec![self.clone(), exponent];
         let backward_fn = |our_value_inner: &ValueInner| {
             // TODO - left off here
             match our_value_inner.prev_nodes.as_deref() {
@@ -150,11 +155,15 @@ impl Value {
                     let mut exponent = exponent.borrow_mut();
                     let our_grad = our_value_inner.grad.unwrap_or(0.0);
                     // deriv of f = a ^ b   w.r.t.   a
-                    base.grad =
-                        Some(base.grad.unwrap_or(0.0) + exponent.data * base.data.powf(exponent.data - 1.0) * our_grad);
+                    base.grad = Some(
+                        (exponent.data * base.data.powf(exponent.data - 1.0))
+                            .mul_add(our_grad, base.grad.unwrap_or(0.0)),
+                    );
                     // deriv of f = a ^ b   w.r.t.   b
-                    exponent.grad =
-                        Some(exponent.grad.unwrap_or(0.0) + base.data.powf(exponent.data) * base.data.ln() * our_grad);
+                    exponent.grad = Some(
+                        (base.data.powf(exponent.data) * base.data.ln())
+                            .mul_add(our_grad, exponent.grad.unwrap_or(0.0)),
+                    );
                 }
                 _ => {
                     unreachable!("binary op must have two ancestors")
@@ -162,27 +171,29 @@ impl Value {
             }
         };
 
-        Value::new(data, Some(prev_nodes), Some(backward_fn))
+        Self::new(data, Some(prev_nodes), Some(backward_fn))
     }
 
-    pub fn exp(&self) -> Value {
-        Value::from(f64::consts::E).pow(self.clone())
+    #[must_use]
+    pub fn exp(&self) -> Self {
+        Self::from(f64::consts::E).pow(self.clone())
     }
 
-    pub fn log(&self) -> Value {
+    #[must_use]
+    pub fn log(&self) -> Self {
         let data = FloatDataScalar::ln(self.data());
         let prev_nodes = vec![self.clone()];
         let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
             Some([orig]) => {
                 let our_grad = our_value_inner.grad.unwrap_or(0.0);
                 let mut orig = orig.borrow_mut();
-                orig.grad = Some(orig.grad.unwrap_or(0.0) + 1.0 / orig.data * our_grad);
+                orig.grad = Some((1.0 / orig.data).mul_add(our_grad, orig.grad.unwrap_or(0.0)));
             }
             _ => {
                 unreachable!("log must have one ancestor")
             }
         };
-        Value::new(data, Some(prev_nodes), Some(backward_fn))
+        Self::new(data, Some(prev_nodes), Some(backward_fn))
     }
 
     pub fn backward(&self) {
@@ -203,24 +214,26 @@ impl Value {
         }
     }
 
-    pub fn relu(&self) -> Value {
+    #[must_use]
+    pub fn relu(&self) -> Self {
         let data = if self.data() <= 0.0 { 0.0 } else { self.data() };
         let prev_nodes = vec![self.clone()];
         let backward_fn = |our_value_inner: &ValueInner| match our_value_inner.prev_nodes.as_deref() {
             Some([first]) => {
                 let mut first = first.borrow_mut();
-                let our_grad = our_value_inner.grad.unwrap_or(0.0);
-                let multiplier = if first.data > 0.0 { 1.0 } else { 0.0 };
-                first.grad = Some(first.grad.unwrap_or(0.0) + multiplier * our_grad);
+                let our_grad: f64 = our_value_inner.grad.unwrap_or(0.0);
+                let multiplier: f64 = if first.data > 0.0 { 1.0 } else { 0.0 };
+                first.grad = Some(multiplier.mul_add(our_grad, first.grad.unwrap_or(0.0)));
             }
             _ => {
                 unreachable!("relu must have one ancestor")
             }
         };
-        Value::new(data, Some(prev_nodes), Some(backward_fn))
+        Self::new(data, Some(prev_nodes), Some(backward_fn))
     }
 }
 
+#[must_use]
 pub fn argmax(values: &[Value]) -> usize {
     // For now (while Value is scalar) - a separate function.
     // Even once Value contains vector - this is non-differentiable and the returned
@@ -267,10 +280,10 @@ impl_binary_op!(self, rhs, Mul, mul, _mul, *, {
             let our_grad = our_value_inner.grad.unwrap_or(0.0);
 
             let first_grad = first.grad().unwrap_or(0.0);
-            first.borrow_mut().grad = Some(first_grad + second.data() * our_grad);
+            first.borrow_mut().grad = Some(second.data().mul_add(our_grad, first_grad));
 
             let second_grad = second.grad().unwrap_or(0.0);
-            second.borrow_mut().grad = Some(second_grad + first.data() * our_grad);
+            second.borrow_mut().grad = Some(first.data().mul_add(our_grad, second_grad));
         }
         _ => {
             unreachable!("binary op must have two ancestors")
@@ -286,28 +299,34 @@ impl_binary_op!(self, rhs, Sub, sub, _sub, -, {
 });
 
 // TODO - using these functions to implement Neuron.normalize was extremely slow - why?
+#[must_use]
 pub fn sum(values: &[Value]) -> Value {
     values.iter().fold(Value::from(0.0), |acc, val| acc + val)
 }
 
+#[must_use]
 pub fn prod(values: &[Value]) -> Value {
     values.iter().fold(Value::from(1.0), |acc, val| acc * val)
 }
 
+#[must_use]
 pub fn pow<T: Clone + Into<Value>>(values: &[Value], exponent: T) -> Vec<Value> {
     values.iter().map(|value| value.pow(exponent.clone().into())).collect()
 }
 
+#[must_use]
 pub fn exp(values: &[Value]) -> Vec<Value> {
-    values.iter().map(|value| value.exp()).collect()
+    values.iter().map(Value::exp).collect()
 }
 
+#[must_use]
 pub fn norm(values: &[Value]) -> Value {
     sum(&pow(values, 2)).pow(0.5)
 }
 
+#[must_use]
 pub fn to_vec(values: &[Value]) -> Vec<FloatDataScalar> {
-    values.iter().map(|v| v.data()).collect()
+    values.iter().map(Value::data).collect()
 }
 
 // TODO - also impl +=, -=, etc, unary ops
@@ -366,7 +385,7 @@ mod tests {
         let x = Value::from(-2.0);
         let y = x.clone() * x.clone();
         y.backward();
-        let (xmg, ymg) = (x.clone(), y);
+        let (xmg, ymg) = (x, y);
 
         let x = Tensor::from(-2.0).set_requires_grad(true);
         let y = &x * &x;
@@ -384,7 +403,7 @@ mod tests {
         let x = Value::from(-2.0);
         let y = x.clone() + x.clone();
         y.backward();
-        let (xmg, ymg) = (x.clone(), y);
+        let (xmg, ymg) = (x, y);
 
         let x = Tensor::from(-2.0).set_requires_grad(true);
         let y = &x + &x;
@@ -435,7 +454,7 @@ mod tests {
         let e = &c - &d;
         let f = e.pow(2.0);
         let g = &f / Value::from(2.0);
-        let g = &g + 10.0 / f.clone();
+        let g = &g + 10.0 / f;
         let h = g.log();
         h.backward();
         let (amg, bmg, gmg) = (a, b, g);
@@ -490,19 +509,19 @@ mod tests {
     #[test]
     fn test_sum() {
         let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
-        assert_close!(sum(&values).data(), 4.0)
+        assert_close!(sum(&values).data(), 4.0);
     }
 
     #[test]
     fn test_prod() {
         let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
-        assert_close!(prod(&values).data(), -6.0)
+        assert_close!(prod(&values).data(), -6.0);
     }
 
     #[test]
     fn test_pow() {
         let values = vec![Value::from(2.0), Value::from(3.0), Value::from(-1.0)];
-        assert_vec_close!(pow(&values, 2.0), vec![Value::from(4.0), Value::from(9.0), Value::from(1.0)])
+        assert_vec_close!(pow(&values, 2.0), vec![Value::from(4.0), Value::from(9.0), Value::from(1.0)]);
     }
 
     #[test]
@@ -524,6 +543,6 @@ mod tests {
         assert_close!(
             norm(&values).data(),
             values.iter().map(|v| v.pow(2.0)).fold(0.0, |acc, val| acc + val.data()).sqrt()
-        )
+        );
     }
 }

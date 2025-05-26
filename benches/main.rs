@@ -1,8 +1,8 @@
 use anyhow::Result;
 use criterion::{Criterion, criterion_group, criterion_main};
 use micrograd_rs::engine::{Value, sum};
-use micrograd_rs::nn::{MLP, Module};
-use micrograd_rs::optim::{Optim, SGD};
+use micrograd_rs::nn::{MLP, Module as _};
+use micrograd_rs::optim::{Optim as _, SGD};
 
 fn ops_in_loop(n: usize) {
     let mut value = Value::from(1.0);
@@ -15,7 +15,7 @@ fn mlp_sgd(n: usize) -> Result<()> {
     {
         let mut model = MLP::new(10, &[10], 2, true);
         let data: Vec<Value> = (0..10).map(|_| Value::from(12.345)).collect();
-        let mut optim = SGD::new(model.parameters(), 0.1);
+        let mut optim = SGD::new(&model.parameters(), 0.1);
 
         for _ in 0..n {
             let out = model.forward(&data)?;

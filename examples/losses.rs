@@ -11,7 +11,7 @@ fn main() {
     dbg!("before", to_vec(&logits), to_vec(&probs_before));
 
     let loss = nll_loss_single(y_true, &log_softmax(&logits));
-    let mut optim = SGD::new(logits.clone(), 1e-3);
+    let mut optim = SGD::new(&logits, 1e-3);
     optim.zero_grad();
     loss.backward();
     optim.step();

@@ -16,8 +16,9 @@ pub struct SGD {
 }
 
 impl SGD {
-    pub fn new(parameters: Vec<Value>, lr: f64) -> Self {
-        Self { parameters, lr }
+    #[must_use]
+    pub fn new(parameters: &[Value], lr: f64) -> Self {
+        Self { parameters: parameters.to_owned(), lr }
     }
 }
 
@@ -29,7 +30,7 @@ impl Optim for SGD {
     }
     fn step(&mut self) {
         for p in &self.parameters {
-            p.borrow_mut().data = p.data() - self.lr * p.grad().expect("step without grad");
+            p.borrow_mut().data = self.lr.mul_add(-p.grad().expect("step without grad"), p.data());
         }
     }
 }
@@ -47,6 +48,7 @@ pub struct AdamW {
 }
 
 impl AdamW {
+    #[must_use]
     pub fn new(parameters: Vec<Value>, lr: f64, beta1: f64, beta2: f64, eps: f64, weight_decay: f64) -> Self {
         let n = parameters.len();
         Self {
@@ -74,18 +76,19 @@ impl Optim for AdamW {
         self.time_step += 1;
         for (idx, p) in self.parameters.iter().enumerate() {
             let grad = p.grad().expect("step without grad");
-            let mom = self.beta1 * self.momentum[idx] + (1.0 - self.beta1) * grad;
+            let mom = self.beta1.mul_add(self.momentum[idx], (1.0 - self.beta1) * grad);
             self.momentum[idx] = mom;
 
-            let vel = self.beta2 * self.velocity[idx] + (1.0 - self.beta2) * grad.powi(2);
+            let vel = self.beta2.mul_add(self.velocity[idx], (1.0 - self.beta2) * grad.powi(2));
             self.velocity[idx] = vel;
 
             let first_moment = mom / (1.0 - self.beta1.powi(self.time_step));
             let second_moment = vel / (1.0 - self.beta2.powi(self.time_step));
 
             let old_val = p.data();
-            p.borrow_mut().data =
-                old_val - self.lr * (first_moment / (second_moment.sqrt() + self.eps)) + self.weight_decay * old_val;
+            p.borrow_mut().data = self
+                .weight_decay
+                .mul_add(old_val, self.lr.mul_add(-(first_moment / (second_moment.sqrt() + self.eps)), old_val));
         }
     }
 }

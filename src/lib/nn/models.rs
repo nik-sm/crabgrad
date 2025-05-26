@@ -8,7 +8,7 @@ pub trait Module {
     fn zero_grad(&self) {
         for param in self.parameters() {
             let mut param = param.borrow_mut();
-            param.grad = None
+            param.grad = None;
         }
     }
 
@@ -22,7 +22,7 @@ pub trait Classifier: Module {
         let mut n_correct = 0usize;
         let mut n_total = 0usize;
 
-        for (data, label) in data_labels.iter() {
+        for (data, label) in data_labels {
             let logits = self.forward(data)?;
             let pred = argmax(&logits);
             n_total += 1;
@@ -58,7 +58,7 @@ impl Neuron {
         // let norm = norm(&self.weights);
         // self.weights = self.weights.iter().map(|w| w / norm.clone()).collect();
 
-        let norm = self.weights.iter().fold(0.0, |acc, val| acc + val.data().powf(2.0)).sqrt();
+        let norm = self.weights.iter().fold(0.0, |acc, val| val.data().mul_add(val.data(), acc)).sqrt();
         self.weights.iter().for_each(|p| p.borrow_mut().data = p.data() / norm);
     }
 }
@@ -78,7 +78,7 @@ impl Module for Neuron {
             result = result + b.clone();
         }
         if self.relu {
-            result = result.relu()
+            result = result.relu();
         }
         Ok(vec![result])
     }
@@ -93,6 +93,7 @@ pub struct Layer {
     pub neurons: Vec<Neuron>,
 }
 impl Layer {
+    #[must_use]
     pub fn new(in_dim: usize, out_dim: usize, bias: bool, relu: bool) -> Self {
         Self { neurons: (0..out_dim).map(|_| Neuron::new(in_dim, bias, relu)).collect() }
     }
@@ -110,7 +111,7 @@ impl Module for Layer {
     }
 
     fn parameters(&self) -> Vec<Value> {
-        self.neurons.iter().flat_map(|neuron| neuron.parameters()).collect()
+        self.neurons.iter().flat_map(Module::parameters).collect()
     }
 }
 
@@ -119,6 +120,7 @@ pub struct MLP {
     layers: Vec<Layer>,
 }
 impl MLP {
+    #[must_use]
     pub fn new(in_dim: usize, hidden_dims: &[usize], out_dim: usize, bias: bool) -> Self {
         // API ensures at least one layer
 
@@ -130,7 +132,7 @@ impl MLP {
 
         for (idx, (d1, d2)) in all_dims.tuple_windows().enumerate() {
             let relu = idx < n;
-            layers.push(Layer::new(d1, d2, bias, relu))
+            layers.push(Layer::new(d1, d2, bias, relu));
         }
 
         Self { layers }
@@ -155,7 +157,7 @@ impl Module for MLP {
     }
 
     fn parameters(&self) -> Vec<Value> {
-        self.layers.iter().flat_map(|layer| layer.parameters()).collect()
+        self.layers.iter().flat_map(Module::parameters).collect()
     }
 }
 
@@ -211,9 +213,9 @@ mod tests {
         let mut n = Neuron::new(3, false, false);
         // n.normalize();
 
-        let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
+        let x = [Value::from(1.0), Value::from(0.0), Value::from(0.0)];
 
-        let mut optim = SGD::new(n.parameters(), 0.1);
+        let mut optim = SGD::new(&n.parameters(), 0.1);
 
         let before = n.parameters();
         assert_not_close!(before[0].data(), 1.0);
@@ -223,7 +225,7 @@ mod tests {
         for _ in 0..1000 {
             // println!("{i}");
             // Move param vector towards being a unit vector aligned with the data
-            let out = n.forward(&x)?.get(0).unwrap().to_owned();
+            let out = n.forward(&x)?.first().unwrap().to_owned();
             let loss = 1 - out;
 
             optim.zero_grad();
@@ -252,7 +254,7 @@ mod tests {
 
         let x = vec![Value::from(1.0), Value::from(0.0), Value::from(0.0)];
 
-        let mut optim = SGD::new(layer.parameters(), 0.1);
+        let mut optim = SGD::new(&layer.parameters(), 0.1);
 
         let neuron_0 = &layer.neurons[0];
         assert_not_close!(neuron_0.parameters()[0].data(), 1.0);

@@ -1,27 +1,31 @@
 use crate::engine::{DiscreteLabel, Value};
 use core::f64;
 
+#[must_use]
 pub fn cross_entropy_single(label: DiscreteLabel, logits: &[Value]) -> Value {
     let log_probs = log_softmax(logits);
     let msg = format!("label must be in range [0, {}]", logits.len());
     -1.0 * log_probs.get(label).expect(&msg).clone()
 }
 
+#[must_use]
 pub fn nll_loss_single(label: DiscreteLabel, log_probs: &[Value]) -> Value {
     let msg = format!("label must be in range [0, {}]", log_probs.len());
     -1.0 * log_probs.get(label).expect(&msg).clone()
 }
 
+#[must_use]
 pub fn log_softmax(logits: &[Value]) -> Vec<Value> {
     let lse = logsumexp(logits);
     logits.iter().map(|l| l - lse.clone()).collect()
 }
 
+#[must_use]
 pub fn max_val(values: &[Value]) -> f64 {
     let mut max_val = f64::NEG_INFINITY;
-    for v in values.iter().map(|v| v.data()) {
+    for v in values.iter().map(super::super::engine::Value::data) {
         if v.is_finite() && v > max_val {
-            max_val = v
+            max_val = v;
         }
     }
     if max_val == f64::NEG_INFINITY {
@@ -30,6 +34,7 @@ pub fn max_val(values: &[Value]) -> f64 {
     max_val
 }
 
+#[must_use]
 pub fn logsumexp(logits: &[Value]) -> Value {
     // Subtract max value, which gives equivalent result but more numerically stable
     let offset = max_val(logits);
@@ -41,7 +46,7 @@ pub fn logsumexp(logits: &[Value]) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::{DiscreteLabel, Value, exp};
+    use crate::engine::{DiscreteLabel, Value};
     use crate::optim::{Optim, SGD};
     use crate::{assert_close, assert_not_close, assert_vec_close, assert_vec_not_close};
     use anyhow::Result;
@@ -62,16 +67,16 @@ mod tests {
 
     #[test]
     fn show_stabilized_log_softmax() {
-        let log_probs = log_softmax(&vec![Value::from(1.0), Value::from(2.0)]);
-        let log_probs_big = log_softmax(&vec![Value::from(1.0 + 10_000.0), Value::from(2.0 + 10_000.0)]);
+        let log_probs = log_softmax(&[Value::from(1.0), Value::from(2.0)]);
+        let log_probs_big = log_softmax(&[Value::from(1.0 + 10_000.0), Value::from(2.0 + 10_000.0)]);
         assert_vec_close!(log_probs, log_probs_big);
-        let log_probs_small = log_softmax(&vec![Value::from(1.0 - 10_000.0), Value::from(2.0 - 10_000.0)]);
+        let log_probs_small = log_softmax(&[Value::from(1.0 - 10_000.0), Value::from(2.0 - 10_000.0)]);
         assert_vec_close!(log_probs, log_probs_small);
 
         // show naive way works fine for small logits, and show this code is correct...
         fn naive_log_softmax(logits: &[Value]) -> Vec<Value> {
             let naive_log_sum_exp =
-                logits.into_iter().map(|v| v.exp()).fold(Value::from(0.0), |acc, val| acc + val).log();
+                logits.iter().map(crate::engine::Value::exp).fold(Value::from(0.0), |acc, val| acc + val).log();
             logits.iter().map(|l| l - naive_log_sum_exp.clone()).collect()
         }
         let log_probs_naive_ok = naive_log_softmax(&[Value::from(1.0), Value::from(2.0)]);
@@ -88,7 +93,7 @@ mod tests {
 
     #[test]
     fn cross_entropy_and_nll_loss() {
-        let logits = vec![Value::from(1.0), Value::from(1.0)];
+        let logits = [Value::from(1.0), Value::from(1.0)];
 
         let label = 0 as DiscreteLabel;
         let loss1 = nll_loss_single(label, &log_softmax(&logits));
@@ -104,7 +109,7 @@ mod tests {
         // - log_softmax computed stably by first subtracting the max logit
         // subtracting the log_softmax which corresponds to subtracting the max logit)
         let z = -(f64::consts::E - 1.0).ln();
-        let logits = vec![Value::from(z), Value::from(0.0)];
+        let logits = [Value::from(z), Value::from(0.0)];
         let loss3 = cross_entropy_single(label, &logits);
         assert_close!(loss3.data(), 1.0);
     }
@@ -112,11 +117,11 @@ mod tests {
     #[test]
     fn losses1() -> Result<()> {
         // Try once with ours
-        let logits = vec![Value::from(1.0), Value::from(1.0)];
+        let logits = [Value::from(1.0), Value::from(1.0)];
         let y_true = 0 as DiscreteLabel;
 
         let loss = nll_loss_single(y_true, &log_softmax(&logits));
-        let mut optim = SGD::new(logits.clone(), 1e-3);
+        let mut optim = SGD::new(&logits, 1e-3);
         optim.zero_grad();
         loss.backward();
         optim.step();
@@ -139,16 +144,16 @@ mod tests {
     #[test]
     fn losses2() -> Result<()> {
         // Try once with ours
-        let logits_a = vec![Value::from(1.0), Value::from(1.0)];
+        let logits_a = [Value::from(1.0), Value::from(1.0)];
         let y_true_a = 0 as DiscreteLabel;
 
-        let logits_b = vec![Value::from(3.0), Value::from(3.0)];
+        let logits_b = [Value::from(3.0), Value::from(3.0)];
         let y_true_b = 1 as DiscreteLabel;
 
         let loss_a = cross_entropy_single(y_true_a, &logits_a);
         let loss_b = cross_entropy_single(y_true_b, &logits_b);
 
-        let mut optim = SGD::new(logits_a.clone().into_iter().chain(logits_b.clone()).collect::<Vec<_>>(), 1e-3);
+        let mut optim = SGD::new(&logits_a.clone().into_iter().chain(logits_b.clone()).collect::<Vec<_>>(), 1e-3);
         let loss = Value::from(0.0) + loss_a + loss_b;
 
         optim.zero_grad();

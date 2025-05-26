@@ -17,7 +17,7 @@ pub struct Trainer<'a> {
 }
 impl<'a> Trainer<'a> {
     pub fn new(model: &'a impl Classifier, optim: &'a mut impl Optim, epochs: usize, batch_size: usize) -> Self {
-        Trainer { model, epochs, optim, batch_size }
+        Trainer { model, optim, epochs, batch_size }
     }
 
     pub fn fit(
@@ -52,7 +52,7 @@ impl<'a> Trainer<'a> {
             log::info!("{:-^20}", format!("Epoch {e}"));
             let bar = ProgressBar::new(batches_per_epoch.try_into()?);
             let batches = train_data_labels.iter().chunks(self.batch_size);
-            for chunk in batches.into_iter() {
+            for chunk in &batches {
                 let mut loss = Value::from(0.0);
                 for (data, label) in chunk {
                     let logits: Vec<Value> = self.model.forward(data)?;
@@ -68,7 +68,7 @@ impl<'a> Trainer<'a> {
 
             log::info!("Train acc: {}", self.model.score(&train_data_labels)?);
             if let Some(ref z) = test_data_labels {
-                log::info!("Test acc: {}", self.model.score(z)?)
+                log::info!("Test acc: {}", self.model.score(z)?);
             }
         }
 
