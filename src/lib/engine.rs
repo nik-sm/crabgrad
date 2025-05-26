@@ -25,34 +25,40 @@ pub struct Value(Rc<RefCell<ValueInner>>);
 
 impl Clone for Value {
     /// To make it super clear that `value.clone()` only increments Rc
+    #[inline]
     fn clone(&self) -> Self {
         Self(Rc::clone(&self.0))
     }
 }
 
 impl From<FloatDataScalar> for Value {
+    #[inline]
     fn from(data: FloatDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
 impl From<&FloatDataScalar> for Value {
+    #[inline]
     fn from(data: &FloatDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
 
 impl From<IntDataScalar> for Value {
+    #[inline]
     fn from(data: IntDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
 impl From<&IntDataScalar> for Value {
+    #[inline]
     fn from(data: &IntDataScalar) -> Self {
         Self(Rc::new(RefCell::new(ValueInner::from(data))))
     }
 }
 
 impl PartialEq for Value {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         ptr::eq(self.0.as_ptr(), other.0.as_ptr())
     }
@@ -61,6 +67,7 @@ impl PartialEq for Value {
 impl Eq for Value {}
 
 impl Hash for Value {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         let h: *mut ValueInner = self.0.as_ptr();
         ptr::hash(h, state);
@@ -75,22 +82,26 @@ impl ValueInner {
 }
 
 impl From<FloatDataScalar> for ValueInner {
+    #[inline]
     fn from(data: FloatDataScalar) -> Self {
         Self { data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 impl From<&FloatDataScalar> for ValueInner {
+    #[inline]
     fn from(data: &FloatDataScalar) -> Self {
         Self { data: *data, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 
 impl From<IntDataScalar> for ValueInner {
+    #[inline]
     fn from(data: IntDataScalar) -> Self {
         Self { data: data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
     }
 }
 impl From<&IntDataScalar> for ValueInner {
+    #[inline]
     fn from(data: &IntDataScalar) -> Self {
         Self { data: *data as FloatDataScalar, grad: None, backward_fn: None, prev_nodes: None }
     }
@@ -98,23 +109,55 @@ impl From<&IntDataScalar> for ValueInner {
 
 impl Deref for Value {
     type Target = Rc<RefCell<ValueInner>>;
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-fn build_topo(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Value>) {
+// TODO - convert from recursion to iteration
+fn build_topo_recursive(node: &Value, visited: &mut HashSet<Value>, topo_rev: &mut Vec<Value>) {
     // v is the child node and we have a link to our parent nodes
     if !visited.contains(node) {
         // PartialEq and Hash both use address of ValueInner
         visited.insert(node.clone());
         if let Some(prev) = &node.borrow().prev_nodes {
             for ancestor in prev {
-                build_topo(ancestor, visited, topo_rev);
+                build_topo_recursive(ancestor, visited, topo_rev);
             }
         }
         topo_rev.push(node.clone());
     }
+}
+
+fn build_topo_iterative(root_node: Value) -> Vec<Value> {
+    enum State {
+        Unripe, // Visit this node's ancestors first
+        Ripe,   // Node's ancestors were completed. Now it is ready
+    }
+
+    let mut visited = HashSet::new();
+    let mut topo_rev = Vec::new(); // The actual topological order
+    let mut stack = vec![(root_node, State::Unripe)];
+    while let Some((node, state)) = stack.pop() {
+        match state {
+            State::Unripe => {
+                stack.push((node.clone(), State::Ripe));
+                if let Some(prev) = node.borrow().prev_nodes.clone() {
+                    for ancestor in prev {
+                        stack.push((ancestor.clone(), State::Unripe));
+                    }
+                }
+            }
+            State::Ripe => {
+                if !visited.contains(&node) {
+                    visited.insert(node.clone());
+                    topo_rev.push(node);
+                }
+            }
+        }
+    }
+    topo_rev
 }
 
 impl Value {
@@ -196,18 +239,28 @@ impl Value {
         Self::new(data, Some(prev_nodes), Some(backward_fn))
     }
 
-    pub fn backward(&self) {
+    pub fn backward_recursive(&self) {
         // Topological order means for all directed edges  parent->child, parent appears first
         // To easily satisfy this property, we add each child, then add its parents, and reverse the whole list at the end
 
         let mut visited = HashSet::new(); // For quick lookup
         let mut topo_rev = Vec::new(); // The actual topological order
-
-        // // start the recursion
-        build_topo(self, &mut visited, &mut topo_rev);
+        // start the recursion
+        build_topo_recursive(self, &mut visited, &mut topo_rev);
 
         self.borrow_mut().grad = Some(1.0);
         for v in topo_rev.iter().rev() {
+            if let Some(backprop) = &v.borrow().backward_fn {
+                backprop(&v.borrow());
+            }
+        }
+    }
+
+    pub fn backward(&self) {
+        let topo = build_topo_iterative(self.clone());
+
+        self.borrow_mut().grad = Some(1.0);
+        for v in topo.iter().rev() {
             if let Some(backprop) = &v.borrow().backward_fn {
                 backprop(&v.borrow());
             }
@@ -300,31 +353,37 @@ impl_binary_op!(self, rhs, Sub, sub, _sub, -, {
 
 // TODO - using these functions to implement Neuron.normalize was extremely slow - why?
 #[must_use]
+#[inline]
 pub fn sum(values: &[Value]) -> Value {
     values.iter().fold(Value::from(0.0), |acc, val| acc + val)
 }
 
 #[must_use]
+#[inline]
 pub fn prod(values: &[Value]) -> Value {
     values.iter().fold(Value::from(1.0), |acc, val| acc * val)
 }
 
 #[must_use]
+#[inline]
 pub fn pow<T: Clone + Into<Value>>(values: &[Value], exponent: &T) -> Vec<Value> {
     values.iter().map(|value| value.pow(exponent.clone().into())).collect()
 }
 
 #[must_use]
+#[inline]
 pub fn exp(values: &[Value]) -> Vec<Value> {
     values.iter().map(Value::exp).collect()
 }
 
 #[must_use]
+#[inline]
 pub fn norm(values: &[Value]) -> Value {
     sum(&pow(values, &2)).pow(0.5)
 }
 
 #[must_use]
+#[inline]
 pub fn to_vec(values: &[Value]) -> Vec<FloatDataScalar> {
     values.iter().map(Value::data).collect()
 }
@@ -481,8 +540,8 @@ mod tests {
         // backward pass went well
         // TODO - note that even strict equality is working, indicating probably op-for-op equivalence
         // When we would be satisfied with merely achieving assert_close
-        assert_eq!(amg.grad().unwrap(), apt.grad().double_value(&[]));
-        assert_eq!(bmg.grad().unwrap(), bpt.grad().double_value(&[]));
+        assert_close!(amg.grad().unwrap(), apt.grad().double_value(&[]));
+        assert_close!(bmg.grad().unwrap(), bpt.grad().double_value(&[]));
     }
 
     #[test]
@@ -545,4 +604,37 @@ mod tests {
             values.iter().map(|v| v.pow(2.0)).fold(0.0, |acc, val| acc + val.data()).sqrt()
         );
     }
+
+    // #[test]
+    // fn compare_topos() {
+    //     fn print_nodes(nodes: impl IntoIterator<Item = Value>) {
+    //         nodes.into_iter().for_each(|node| print!("{}, ", node.data()));
+    //     }
+
+    //     let x = Value::from(-4.0);
+    //     let z = 2 * &x + 2 + &x;
+    //     let q = &z.relu() + &z * &x;
+    //     let h = (&z * &z).relu();
+    //     let y = h + &q + &q * &x;
+    //     y.backward();
+
+    //     let topo_iter = build_topo_iterative(y.clone());
+
+    //     let x = Value::from(-4.0);
+    //     let z = 2 * &x + 2 + &x;
+    //     let q = &z.relu() + &z * &x;
+    //     let h = (&z * &z).relu();
+    //     let y = h + &q + &q * &x;
+    //     y.backward();
+
+    //     let mut visited = HashSet::new();
+    //     let mut topo_rev_rec = Vec::new();
+    //     build_topo_recursive(&y.clone(), &mut visited, &mut topo_rev_rec);
+
+    //     print!("Iter: ");
+    //     print_nodes(topo_iter.into_iter().rev());
+    //     println!();
+    //     print!("Rec: ");
+    //     print_nodes(topo_rev_rec.into_iter().rev());
+    // }
 }

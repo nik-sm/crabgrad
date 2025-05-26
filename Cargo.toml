@@ -34,6 +34,10 @@ all = "warn"
 cargo = "warn"
 correctness = "deny"
 
+[profile.release-lto]
+inherits = "release"
+lto = true
+
 
 [[bench]]
 name = "benchmark"
