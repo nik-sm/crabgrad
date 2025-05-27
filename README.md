@@ -13,7 +13,7 @@ cargo clippy  # lints
 cargo bench  # run benchmarks before & after changes
 
 cargo run --example mlp  # Example end-to-end library usage
-cargo flamegraph --root --bin mlp   # View output SVG in firefox
+cargo flamegraph --root --example mlp --profile release-lto  # View output SVG in firefox
 ```
 
 ## Comparison against Pytorch
@@ -44,12 +44,13 @@ cargo run --example losses
 python pytorch-examples/unit-vector.py
 cargo run --example unit-vector
 
-# NOTE - performance after 1 epoch is worse in ours, possibly because:
-# - Weight init methods are definitely different and this can be important
-# - AdamW implementation may be buggy
 python pytorch-examples/mnist.py
 cargo run --example mnist
 ```
+
+Note that MNIST performance is worse than pytorch, possibly because:
+- Weight init methods are definitely different and this can be important
+- AdamW implementation here may be buggy
 
 ## Comparison against tch
 
