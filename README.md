@@ -71,9 +71,11 @@ cargo test
 
 - Engineering and ergonomics:
     - Be sure all ops can be used on literals of `i64` or `f64`, and add tests
-    - Deduplicate
+    - Deduplicate and use macros for boilerplate impl blocks
     - More convenience ops: +=, -=, *=, /=, unary negation
 
-- Parallelize trainer (inside batch, synchronize before step)
+- Think of ways to speedup
+    - Data parallelism in trainer: copy model and items to each worker, forward, accumulate, backward.
+      A bit invasive - would probably need to change `Value` from being `Rc<RefCell<ValueInner>>` to `Arc<Mutex<ValueInner>>`
 
 - When doing `Module::score()`, add progress bar and also parallelize
