@@ -23,10 +23,14 @@ log = "0.4.27"
 paste = "1.0.15"
 rand = { version = "0.9.1", features = ["std_rng"] }
 rand_distr = "0.5.1"
+rayon = "1.10.0"
 
 [dev-dependencies]
 criterion = "0.6.0"
 flamegraph = "0.6.8"
+hf-hub = "0.4.2"
+image = "0.25.6"
+parquet = "55.1.0"
 tch = { version = "0.20.0", features = ["download-libtorch"] }
 
 [lints.clippy]

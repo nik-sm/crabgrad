@@ -43,13 +43,17 @@ cargo run --example losses
 
 python pytorch-examples/unit-vector.py
 cargo run --example unit-vector
+
+# NOTE - performance after 1 epoch is worse in ours, possibly because:
+# - Weight init methods are definitely different and this can be important
+# - AdamW implementation may be buggy
+python pytorch-examples/mnist.py
+cargo run --example mnist
 ```
 
 ## Comparison against tch
 
-`tch` requires libtorch.
-
-A simple way is to install using: `cargo add tch --features download-libtorch`
+`tch` requires libtorch. A simple way is to install using: `cargo add tch --features download-libtorch`
 
 Alternatively, a python installation with pytorch installed can also be used:
 ```shell
@@ -70,4 +74,6 @@ cargo test
     - Deduplicate
     - More convenience ops: +=, -=, *=, /=, unary negation
 
-- Add MNIST example
+- Parallelize trainer (inside batch, synchronize before step)
+
+- When doing `Module::score()`, add progress bar and also parallelize

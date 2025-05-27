@@ -1,8 +1,16 @@
 use crate::impl_binary_op;
+use anyhow::Result;
+use anyhow::bail;
 use core::f64;
+use itertools::Itertools;
+use rand;
+use rand::Rng;
+use rand::SeedableRng;
+use rand::seq::SliceRandom;
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::ops::{Add, Deref, Div, Mul, Sub};
 use std::ptr;
 use std::rc::Rc;
@@ -10,7 +18,63 @@ use std::rc::Rc;
 pub type FloatDataScalar = f64;
 pub type IntDataScalar = i64;
 pub type DiscreteLabel = usize;
-pub type Dataset<X, Y> = Vec<(X, Y)>;
+
+pub struct Dataset<X, Y> {
+    pub items: Vec<(Vec<X>, Y)>,
+    pub n_features: usize,
+    pub n_classes: usize,
+}
+impl<X: Clone, Y: Clone + Eq + Hash> Dataset<X, Y> {
+    pub fn new(data: Vec<Vec<X>>, labels: Vec<Y>) -> Result<Self> {
+        Self::new_from_slice(data.into_iter().zip(labels).collect::<Vec<_>>().as_ref())
+    }
+
+    fn new_from_slice(data_labels: &[(Vec<X>, Y)]) -> Result<Self> {
+        let uniq_lens: Vec<usize> = data_labels.iter().map(|(x, _)| x.len()).unique().collect();
+        let n_uniq_labels: usize = data_labels.iter().map(|(_, y)| y).unique().count();
+        match uniq_lens.len() {
+            1 => Ok(Self { items: data_labels.to_vec(), n_features: uniq_lens[0], n_classes: n_uniq_labels }),
+            _ => bail!("Data with multiple lengths found: {:?}", uniq_lens),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn split_at(&self, n: usize) -> Result<(Dataset<X, Y>, Dataset<X, Y>)> {
+        let (left, right) = self.items.split_at(n);
+        Ok((Dataset::new_from_slice(left)?, Dataset::new_from_slice(right)?))
+    }
+
+    pub fn shuffle(&mut self, rng: &mut impl Rng) {
+        self.items.shuffle(rng)
+    }
+
+    #[must_use]
+    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn train_test_split(&mut self, train_frac: f64, test_frac: f64) -> Result<(Dataset<X, Y>, Dataset<X, Y>)> {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+        let n_total = self.len() as f64;
+        let n_train = ((train_frac / (train_frac + test_frac)).clamp(0.0, 1.0) * n_total) as usize;
+
+        self.shuffle(&mut rng);
+        let (train_dataset, test_dataset) = self.split_at(n_train)?;
+        Ok((train_dataset, test_dataset))
+    }
+}
+
+impl<X, Y> IntoIterator for Dataset<X, Y> {
+    type Item = (Vec<X>, Y);
+
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ValueInner {

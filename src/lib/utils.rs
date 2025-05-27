@@ -7,7 +7,6 @@ use itertools::Itertools;
 use log::Level;
 use rand;
 use rand::SeedableRng;
-use rand::seq::SliceRandom;
 use rand_distr::{Distribution, Normal};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -133,7 +132,7 @@ macro_rules! assert_vec_not_close {
 pub fn make_binary_classification(
     n_samples_each_class: usize,
     n_features: usize,
-) -> (Vec<Vec<FloatDataScalar>>, Vec<DiscreteLabel>) {
+) -> Result<Dataset<FloatDataScalar, DiscreteLabel>> {
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
     let mut data: Vec<Vec<FloatDataScalar>> = Vec::with_capacity(2 * n_samples_each_class * n_features);
     let mut labels: Vec<DiscreteLabel> = Vec::with_capacity(2 * n_samples_each_class);
@@ -164,28 +163,7 @@ pub fn make_binary_classification(
             .map(std::iter::Iterator::collect),
     );
     labels.extend(vec![1; n_samples_each_class]);
-
-    (data, labels)
-}
-
-#[must_use]
-#[allow(clippy::cast_sign_loss)]
-#[allow(clippy::cast_possible_truncation)]
-#[allow(clippy::cast_precision_loss)]
-pub fn train_test_split<X: Clone, Y: Clone>(
-    mut zipped_data_labels: Dataset<X, Y>,
-    train_frac: f64,
-    test_frac: f64,
-) -> (Dataset<X, Y>, Dataset<X, Y>) {
-    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-    let n_total = zipped_data_labels.len() as f64;
-    // let train_frac = train_frac.clamp(0.0, 1.0);
-    // let test_frac = test_frac.clamp(0.0, 1.0);
-    let n_train = ((train_frac / (train_frac + test_frac)).clamp(0.0, 1.0) * n_total) as usize;
-
-    zipped_data_labels.shuffle(&mut rng);
-    let (train_part, test_part) = zipped_data_labels.split_at(n_train);
-    (train_part.to_vec(), test_part.to_vec())
+    Dataset::new(data, labels)
 }
 
 #[cfg(test)]
@@ -226,13 +204,14 @@ mod tests {
     }
 
     #[test]
-    fn toy_data() {
+    fn toy_data() -> Result<()> {
         let n_samples_each_class = 10;
         let n_features = 8;
-        let (data, labels) = make_binary_classification(n_samples_each_class, n_features);
+        let dataset = make_binary_classification(n_samples_each_class, n_features)?;
 
-        assert_eq!(data.len(), 2 * n_samples_each_class, "n items");
-        assert_eq!(data[0].len(), n_features, "n features");
-        assert_eq!(labels.len(), 2 * n_samples_each_class);
+        assert_eq!(dataset.len(), 2 * n_samples_each_class, "n items");
+        assert_eq!(dataset.n_features, n_features, "n features");
+        assert_eq!(dataset.n_classes, 2);
+        Ok(())
     }
 }

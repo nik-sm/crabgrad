@@ -11,11 +11,10 @@ fn main() -> Result<()> {
     let epochs = 10;
     let batch_size = 32;
 
-    let (data, labels) = make_binary_classification(n_samples_each_class, n_features);
+    let dataset = make_binary_classification(n_samples_each_class, n_features)?;
 
     init_logging();
-    let (train_data_labels, test_data_labels) =
-        train_test_split(data.into_iter().zip(labels).collect::<Vec<_>>(), 0.8, 0.2);
+    let (train_dataset, test_dataset) = train_test_split(dataset, 0.8, 0.2)?;
 
     // NOTE - performance for this toy problem is fragile and sensitive to hidden dims and weight init
     let model = MLP::new(n_features, &[32], n_classes, true);
@@ -23,7 +22,7 @@ fn main() -> Result<()> {
     // let optim = SGD::new(model.parameters(), 1e-3);
     let mut optim = AdamW::new(model.parameters(), 1e-2, 0.9, 0.999, 1e-8, 0.0);
     let mut trainer = Trainer::new(&model, &mut optim, epochs, batch_size);
-    trainer.fit(train_data_labels, Some(test_data_labels))?;
+    trainer.fit(train_dataset, Some(test_dataset))?;
 
     Ok(())
 }
