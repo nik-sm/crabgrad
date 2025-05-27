@@ -12,6 +12,8 @@ cargo test  # run tests
 cargo clippy  # lints
 cargo bench  # run benchmarks before & after changes
 
+cargo build --profile release-lto  # LTO => slower compile, faster binary
+
 cargo run --example mlp  # Example end-to-end library usage
 cargo flamegraph --root --example mlp --profile release-lto  # View output SVG in firefox
 ```
@@ -35,17 +37,17 @@ pip install -r pytorch-examples/requirements.txt
 
 Run scripts:
 ```shell
-python pytorch-examples/mlp.py
-cargo run --example mlp
-
 python pytorch-examples/losses.py
 cargo run --example losses
 
 python pytorch-examples/unit-vector.py
 cargo run --example unit-vector
 
+python pytorch-examples/mlp.py
+cargo run --example mlp --profile release-lto
+
 python pytorch-examples/mnist.py
-cargo run --example mnist
+cargo run --example mnist --profile release-lto
 ```
 
 Note that MNIST performance is worse than pytorch, possibly because:

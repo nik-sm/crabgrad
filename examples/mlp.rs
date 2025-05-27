@@ -2,7 +2,7 @@ use anyhow::Result;
 use micrograd_rs::nn::{MLP, Module, Trainer};
 // use micrograd_rs::optim::SGD;
 use micrograd_rs::optim::AdamW;
-use micrograd_rs::utils::{init_logging, make_binary_classification, train_test_split};
+use micrograd_rs::utils::{init_logging, make_binary_classification};
 
 fn main() -> Result<()> {
     let n_features = 64;
@@ -11,10 +11,10 @@ fn main() -> Result<()> {
     let epochs = 10;
     let batch_size = 32;
 
-    let dataset = make_binary_classification(n_samples_each_class, n_features)?;
+    let mut dataset = make_binary_classification(n_samples_each_class, n_features)?;
 
     init_logging();
-    let (train_dataset, test_dataset) = train_test_split(dataset, 0.8, 0.2)?;
+    let (train_dataset, test_dataset) = dataset.train_test_split(0.8, 0.2)?;
 
     // NOTE - performance for this toy problem is fragile and sensitive to hidden dims and weight init
     let model = MLP::new(n_features, &[32], n_classes, true);
