@@ -1,8 +1,8 @@
 use anyhow::Result;
-use micrograd_rs::engine::{FloatDataScalar, Value, sum, to_vec};
-use micrograd_rs::nn::{Layer, Module};
-use micrograd_rs::optim::{Optim, SGD};
-use micrograd_rs::{assert_close, assert_vec_close};
+use crabgrad::engine::{sum, to_vec, FloatDataScalar, Value};
+use crabgrad::nn::{Layer, Module};
+use crabgrad::optim::{Optim, SGD};
+use crabgrad::{assert_close, assert_vec_close};
 
 fn main() -> Result<()> {
     fn get_weights(layer: &Layer) -> Vec<FloatDataScalar> {

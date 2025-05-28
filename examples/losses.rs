@@ -1,6 +1,6 @@
-use micrograd_rs::engine::{DiscreteLabel, Value, exp, to_vec};
-use micrograd_rs::nn::loss::{log_softmax, nll_loss_single};
-use micrograd_rs::optim::{Optim, SGD};
+use crabgrad::engine::{exp, to_vec, DiscreteLabel, Value};
+use crabgrad::nn::loss::{log_softmax, nll_loss_single};
+use crabgrad::optim::{Optim, SGD};
 
 fn main() {
     // Try once with ours

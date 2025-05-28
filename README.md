@@ -10,9 +10,8 @@ Typical cargo commands are used to lint, check, compile, and run examples:
 cargo check  # static checks
 cargo test  # run tests
 cargo clippy  # lints
-cargo bench  # run benchmarks before & after changes
-
-cargo build --profile release-lto  # LTO => slower compile, faster binary
+cargo bench --profile release-lto  # run benchmarks before & after changes
+cargo build --profile release-lto
 
 cargo run --example mlp  # Example end-to-end library usage
 cargo flamegraph --root --example mlp --profile release-lto  # View output SVG in firefox
@@ -20,7 +19,7 @@ cargo flamegraph --root --example mlp --profile release-lto  # View output SVG i
 
 ## Comparison against Pytorch
 
-Create frozen requirements:
+Re-create frozen requirements after adding python dependencies:
 ```shell
 python3 -m venv venv
 source venv/bin/activate
@@ -28,7 +27,7 @@ pip install -r pytorch-examples/requirements.in
 pip freeze > pytorch-examples/requirements.txt
 ```
 
-Create environment from frozen requirements:
+Or create environment from existing frozen requirements:
 ```shell
 python3 -m venv venv
 source venv/bin/activate
@@ -77,8 +76,9 @@ cargo test
     - Deduplicate and use macros for boilerplate impl blocks
     - More convenience ops: +=, -=, *=, /=, unary negation
 
-- Think of ways to speedup
+- Consider simple opportunities for speedup
     - Data parallelism in trainer: copy model and items to each worker, forward, accumulate, backward.
-      A bit invasive - would probably need to change `Value` from being `Rc<RefCell<ValueInner>>` to `Arc<Mutex<ValueInner>>`
+      A bit invasive - would probably need to change `Value` from being `Rc<RefCell<ValueInner>>` to `Arc<Mutex<ValueInner>>` or `Arc<RwLock<ValueInner>>`
 
-- When doing `Module::score()`, add progress bar and also parallelize
+- When doing `Module::score()`, add progress bar to avoid long silence and also parallelize
+    - Add a `no_grad` mode

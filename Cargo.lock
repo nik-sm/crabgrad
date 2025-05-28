@@ -759,6 +759,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "crabgrad"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "colored",
+ "criterion",
+ "env_logger",
+ "flamegraph",
+ "hf-hub",
+ "image",
+ "indicatif",
+ "itertools 0.14.0",
+ "log",
+ "parquet",
+ "paste",
+ "rand 0.9.1",
+ "rand_distr",
+ "tch",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2114,28 +2136,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "micrograd-rs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "colored",
- "criterion",
- "env_logger",
- "flamegraph",
- "hf-hub",
- "image",
- "indicatif",
- "itertools 0.14.0",
- "log",
- "parquet",
- "paste",
- "rand 0.9.1",
- "rand_distr",
- "tch",
 ]
 
 [[package]]

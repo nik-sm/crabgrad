@@ -1,8 +1,8 @@
 use anyhow::Result;
-use criterion::{Criterion, criterion_group, criterion_main};
-use micrograd_rs::engine::{Value, norm, sum};
-use micrograd_rs::nn::{MLP, Module as _};
-use micrograd_rs::optim::{Optim as _, SGD};
+use crabgrad::engine::{norm, sum, Value};
+use crabgrad::nn::{Module as _, MLP};
+use crabgrad::optim::{Optim as _, SGD};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn ops_in_loop(n: usize) {
     let mut value = Value::from(1.0);

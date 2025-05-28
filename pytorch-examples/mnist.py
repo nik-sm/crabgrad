@@ -48,7 +48,7 @@ def main():
     train_loader = DataLoader(train_mnist, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_mnist, batch_size=batch_size, shuffle=False)
 
-    # model - as small as possible since micrograd_rs is not optimized
+    # model - as small as possible since crabgrad is not optimized
     model = nn.Sequential(
         nn.Flatten(1),
         nn.Linear(28 * 28, 10, bias=True),

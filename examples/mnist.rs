@@ -1,10 +1,10 @@
 use anyhow::Result;
-use hf_hub::{Repo, RepoType, api::sync::Api};
-use micrograd_rs::{
+use crabgrad::{
     engine::{Dataset, DiscreteLabel, FloatDataScalar},
-    nn::{MLP, Module, Trainer},
+    nn::{Module, Trainer, MLP},
     optim::AdamW,
 };
+use hf_hub::{api::sync::Api, Repo, RepoType};
 use parquet::file::reader::SerializedFileReader;
 // use parquet::file::reader::FileReader;
 

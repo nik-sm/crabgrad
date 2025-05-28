@@ -1,8 +1,8 @@
 use anyhow::Result;
-use micrograd_rs::nn::{MLP, Module, Trainer};
-// use micrograd_rs::optim::SGD;
-use micrograd_rs::optim::AdamW;
-use micrograd_rs::utils::{init_logging, make_binary_classification};
+use crabgrad::nn::{Module, Trainer, MLP};
+// use crabgrad::optim::SGD;
+use crabgrad::optim::AdamW;
+use crabgrad::utils::{init_logging, make_binary_classification};
 
 fn main() -> Result<()> {
     let n_features = 64;
