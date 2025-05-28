@@ -1,4 +1,4 @@
-A simple and non-optimized backward-mode automatic differentiation library, heavily inspired by https://github.com/karpathy/micrograd/.
+A simple and non-optimized reverse-mode automatic differentiation library, heavily inspired by https://github.com/karpathy/micrograd/.
 
 To check for correctness against torch, there are unit tests that use [tch-rs](https://github.com/LaurentMazare/tch-rs) and scripts that use [pytorch](https://github.com/pytorch/pytorch).
 

@@ -3,9 +3,9 @@ name = "crabgrad"
 version = "0.1.0"
 edition = "2024"
 resolver = "3"
-description = "A simple and non-optimized backward-mode automatic differentiation library in Rust, heavily inspired by https://github.com/karpathy/micrograd/."
+description = "A simple and non-optimized reverse-mode automatic differentiation library in Rust, heavily inspired by https://github.com/karpathy/micrograd/."
 repository = "https://github.com/nik-sm/crabgrad"
-keywords = ["automatic differentiation", "autograd", "backward mode", "neural networks"]
+keywords = ["automatic differentiation", "autograd", "reverse-mode", "neural networks"]
 categories = ["science", "mathematics"]
 license-file = "LICENSE"
 
